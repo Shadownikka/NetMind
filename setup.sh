@@ -3,11 +3,10 @@
 # ║              NetMind — Bootstrap Installer                               ║
 # ║                                                                          ║
 # ║  This is the ONLY file you need. Run it once.                            ║
-# ║  It downloads and installs the full NetMind application automatically.   ║
+# ║  It installs the full NetMind application automatically.                 ║
 # ║                                                                          ║
 # ║  Usage:                                                                  ║
-# ║    sudo bash setup.sh              → downloads app from server           ║
-# ║    sudo bash setup.sh --local      → uses local tarball for testing      ║
+# ║    sudo bash setup.sh                                                    ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 
 set -e
@@ -23,20 +22,11 @@ err()  { echo -e "${RED}\n  ✘ ERROR: $*${RESET}\n"; exit 1; }
 step() { echo -e "\n${BOLD}${MAGENTA}[$1/9]${RESET} ${BOLD}$2${RESET}"; }
 
 # ── Config ────────────────────────────────────────────────────────────────────
-# TODO: Replace with your actual download URL when your server is ready
-APP_DOWNLOAD_URL="https://YOUR-SERVER.com/downloads/netmind-app-latest.tar.gz"
-
 INSTALL_DIR="/opt/netmind"
 LAUNCHER_BIN="/usr/local/bin/netmind-launch"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REAL_USER="${SUDO_USER:-$USER}"
 REAL_HOME="$(eval echo ~$REAL_USER)"
-LOCAL_MODE=false
-
-# ── Parse arguments ───────────────────────────────────────────────────────────
-for arg in "$@"; do
-  [[ "$arg" == "--local" ]] && LOCAL_MODE=true
-done
 
 # ── Root check ────────────────────────────────────────────────────────────────
 [[ $EUID -ne 0 ]] && err "Please run with sudo:  sudo bash setup.sh"
@@ -52,13 +42,9 @@ echo "  ██║╚██╗██║██╔══╝     ██║   ██�
 echo "  ██║ ╚████║███████╗   ██║   ██║ ╚═╝ ██║██║██║ ╚████║██████╔╝"
 echo "  ╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═════╝ "
 echo -e "${RESET}"
-echo -e "${BOLD}  AI-Powered Network Manager — Installer v1.0${RESET}"
+echo -e "${BOLD}  AI-Powered Network Manager — Installer v2.0${RESET}"
 echo ""
-if $LOCAL_MODE; then
-  echo -e "${YELLOW}  [LOCAL MODE — using local tarball for testing]${RESET}"
-else
-  echo -e "${CYAN}  Run this once. NetMind installs itself and appears on your desktop.${RESET}"
-fi
+echo -e "${CYAN}  Run this once. NetMind installs itself and appears on your desktop.${RESET}"
 echo ""
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -97,6 +83,7 @@ APT_PKGS=(
   python3-pyaudio
   libgl1 libglib2.0-0 libxcb-xinerama0 libxcb-icccm4 libxcb-image0
   libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xkb1
+  libxcb-cursor0
   libxkbcommon-x11-0 libxkbcommon0 libegl1 libdbus-1-3
   libpcap-dev libffi-dev libssl-dev
   net-tools iproute2 curl wget git ca-certificates gnupg
@@ -122,62 +109,29 @@ esac
 ok "System packages installed"
 
 # ════════════════════════════════════════════════════════════════════════════
-# STEP 3 — DOWNLOAD & EXTRACT APP FILES
+# STEP 3 — COPY APP FILES
 # ════════════════════════════════════════════════════════════════════════════
-step 3 "Getting NetMind Application Files"
+step 3 "Installing NetMind Application Files"
 
 mkdir -p "$INSTALL_DIR"
 
-if $LOCAL_MODE; then
-  # ── Local testing mode ───────────────────────────────────────────────────
-  # Looks for tarball next to setup.sh, or in /tmp
-  TARBALL=""
-  for candidate in \
-    "$SCRIPT_DIR/netmind-app-latest.tar.gz" \
-    "/tmp/netmind-app-latest.tar.gz"; do
-    [[ -f "$candidate" ]] && TARBALL="$candidate" && break
-  done
-
-  [[ -z "$TARBALL" ]] && err \
-    "Local mode: tarball not found.\n\n" \
-    "  Place netmind-app-latest.tar.gz next to setup.sh or in /tmp/\n" \
-    "  then run:  sudo bash setup.sh --local"
-
-  info "Extracting from local tarball: $TARBALL"
+TARBALL="$SCRIPT_DIR/netmind-app.tar.gz"
+if [[ -f "$TARBALL" ]]; then
+  info "Extracting from $TARBALL..."
   tar -xzf "$TARBALL" -C "$INSTALL_DIR"
-  ok "App files extracted from local tarball"
-
-else
-  # ── Production mode: download from server ────────────────────────────────
-  [[ "$APP_DOWNLOAD_URL" == *"YOUR-SERVER"* ]] && err \
-    "Download URL not configured yet.\n" \
-    "  Edit setup.sh and set APP_DOWNLOAD_URL to your server URL.\n" \
-    "  Or test locally with:  sudo bash setup.sh --local"
-
-  TMP_TARBALL="/tmp/netmind-app-latest.tar.gz"
-  info "Downloading NetMind from server..."
-  info "URL: $APP_DOWNLOAD_URL"
-
-  if command -v wget &>/dev/null; then
-    wget --show-progress -q "$APP_DOWNLOAD_URL" -O "$TMP_TARBALL" \
-      || err "Download failed. Check your internet connection."
-  else
-    curl -L --progress-bar "$APP_DOWNLOAD_URL" -o "$TMP_TARBALL" \
-      || err "Download failed. Check your internet connection."
-  fi
-
-  ok "Downloaded ($(du -sh $TMP_TARBALL | cut -f1))"
-  info "Extracting to $INSTALL_DIR..."
-  tar -xzf "$TMP_TARBALL" -C "$INSTALL_DIR"
-  rm -f "$TMP_TARBALL"
   ok "App files extracted to $INSTALL_DIR"
+elif [[ -f "$SCRIPT_DIR/NetMindDesktop.py" ]]; then
+  info "Copying app files from $SCRIPT_DIR..."
+  rsync -a --exclude="setup.sh" --exclude="*.tar.gz" "$SCRIPT_DIR/" "$INSTALL_DIR/" 2>/dev/null || \
+    cp -r "$SCRIPT_DIR/." "$INSTALL_DIR/"
+  ok "App files copied from $SCRIPT_DIR"
+else
+  err "App files not found.\n  Place netmind-app.tar.gz in the same folder as setup.sh and try again."
 fi
 
-# Verify extraction
 [[ -f "$INSTALL_DIR/NetMindDesktop.py" ]] || \
-  err "Extraction failed — NetMindDesktop.py not found in $INSTALL_DIR"
+  err "Installation failed — NetMindDesktop.py not found in $INSTALL_DIR"
 
-# Fix permissions
 chown -R "$REAL_USER":"$REAL_USER" "$INSTALL_DIR"
 chmod +x "$INSTALL_DIR/start.sh" \
          "$INSTALL_DIR/stop.sh"  \
@@ -192,7 +146,6 @@ step 4 "Installing Python Dependencies"
 REQS="$INSTALL_DIR/requirements.txt"
 PIP_FLAGS="--quiet --no-warn-script-location"
 
-# Install PyAudio via apt first (avoids portaudio.h compilation error with pip)
 info "Installing PyAudio via system package..."
 apt-get install -y python3-pyaudio 2>/dev/null || \
   dnf install -y python3-pyaudio 2>/dev/null || \
@@ -203,16 +156,15 @@ if pip3 install $PIP_FLAGS -r "$REQS" 2>/dev/null; then
   ok "Python packages installed"
 else
   info "System-managed Python — using --break-system-packages..."
-  pip3 install $PIP_FLAGS --break-system-packages -r "$REQS"
+  pip3 install $PIP_FLAGS --break-system-packages --ignore-installed -r "$REQS"
   ok "Python packages installed"
 fi
 
-# Ensure packages are available when running as root
-pip3 install $PIP_FLAGS --break-system-packages -r "$REQS" 2>/dev/null || true
+pip3 install $PIP_FLAGS --break-system-packages --ignore-installed -r "$REQS" 2>/dev/null || true
 ok "Packages available for root Python"
 
 # ════════════════════════════════════════════════════════════════════════════
-# STEP 5 — DOCKER
+# STEP 5 — DOCKER (Prometheus + Grafana)
 # ════════════════════════════════════════════════════════════════════════════
 step 5 "Installing Docker"
 
@@ -222,13 +174,21 @@ else
   info "Installing Docker..."
   case "$PKG_MGR" in
     apt)
+      if   [[ "$DISTRO_LIKE" == *"ubuntu"* || "$DISTRO" == "ubuntu" ]]; then
+        DOCKER_DISTRO="ubuntu"
+      elif [[ "$DISTRO_LIKE" == *"debian"* || "$DISTRO" == "debian" ]]; then
+        DOCKER_DISTRO="debian"
+      else
+        DOCKER_DISTRO="ubuntu"
+      fi
+      DOCKER_CODENAME=$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
       install -m 0755 -d /etc/apt/keyrings
-      curl -fsSL "https://download.docker.com/linux/${DISTRO}/gpg" \
+      curl -fsSL "https://download.docker.com/linux/${DOCKER_DISTRO}/gpg" \
         | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
       chmod a+r /etc/apt/keyrings/docker.gpg
       echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-        https://download.docker.com/linux/${DISTRO} \
-        $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+        https://download.docker.com/linux/${DOCKER_DISTRO} \
+        ${DOCKER_CODENAME} stable" \
         | tee /etc/apt/sources.list.d/docker.list > /dev/null
       apt-get update -qq
       DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -248,29 +208,82 @@ docker compose version &>/dev/null && ok "Docker Compose ready" || warn "Docker 
 # ════════════════════════════════════════════════════════════════════════════
 # STEP 6 — OLLAMA + AI MODEL
 # ════════════════════════════════════════════════════════════════════════════
-step 6 "Installing Ollama + Llama 3.1 AI Model (~4.9 GB)"
+step 6 "Installing & Verifying Ollama + Llama 3.1 AI Model (~4.9 GB)"
 
-if ! command -v ollama &>/dev/null; then
-  info "Installing Ollama..."
+# ── Verify Ollama has no silent problems ─────────────────────────────────────
+# Returns 0 if healthy, 1 if broken.
+_verify_ollama() {
+  # 1. Binary must exist
+  command -v ollama &>/dev/null || return 1
+
+  # 2. The lib directory must contain actual binaries, not just text/license files.
+  #    The known silent failure: Ollama installs but llama-server binary is missing,
+  #    leaving only text files in /usr/local/lib/ollama/.
+  local lib_dir="/usr/local/lib/ollama"
+  if [[ -d "$lib_dir" ]]; then
+    local bin_count
+    bin_count=$(find "$lib_dir" -maxdepth 2 -type f \
+      ! -name "*.txt" ! -name "*.md" ! -name "LICENSE*" ! -name "README*" \
+      | wc -l)
+    [[ "$bin_count" -gt 0 ]] || return 1
+  fi
+
+  # 3. API must respond (start a temporary daemon if needed).
+  if ! curl -sf http://localhost:11434/api/tags &>/dev/null; then
+    nohup ollama serve > /tmp/ollama-verify.log 2>&1 &
+    local _srv_pid=$!
+    local _waited=0
+    while [[ $_waited -lt 12 ]]; do
+      sleep 2; ((_waited+=2))
+      curl -sf http://localhost:11434/api/tags &>/dev/null && break
+    done
+    kill "$_srv_pid" 2>/dev/null || true
+    curl -sf http://localhost:11434/api/tags &>/dev/null || return 1
+  fi
+
+  return 0
+}
+
+# ── Install or reinstall ──────────────────────────────────────────────────────
+_install_ollama() {
+  info "Downloading Ollama installer..."
   curl -fsSL https://ollama.com/install.sh | sh
-  ok "Ollama installed"
+}
+
+if command -v ollama &>/dev/null; then
+  info "Ollama found — running integrity check..."
+  if _verify_ollama; then
+    ok "Ollama verified ($(ollama --version 2>/dev/null | head -1 || echo 'version unknown'))"
+  else
+    warn "Ollama has silent problems (missing binaries or API unreachable)"
+    info "Reinstalling Ollama from official installer..."
+    # Stop any running instance before reinstalling
+    pkill -x ollama 2>/dev/null || true
+    sleep 2
+    _install_ollama
+    ok "Ollama reinstalled"
+  fi
 else
-  ok "Ollama already installed"
+  info "Ollama not found — installing..."
+  _install_ollama
+  ok "Ollama installed"
 fi
 
-if ! pgrep -x ollama &>/dev/null; then
-  info "Starting Ollama..."
+# ── Start daemon ──────────────────────────────────────────────────────────────
+if ! curl -sf http://localhost:11434/api/tags &>/dev/null; then
+  info "Starting Ollama daemon..."
   nohup ollama serve > /tmp/ollama-setup.log 2>&1 &
   sleep 5
 fi
 
 info "Waiting for Ollama API..."
 for i in $(seq 1 30); do
-  curl -sf http://localhost:11434/api/tags &>/dev/null && ok "Ollama ready" && break
+  curl -sf http://localhost:11434/api/tags &>/dev/null && ok "Ollama API ready" && break
   sleep 2
   [[ $i -eq 30 ]] && warn "Ollama slow to start — continuing anyway"
 done
 
+# ── Pull model ────────────────────────────────────────────────────────────────
 if ollama list 2>/dev/null | grep -q "llama3.1"; then
   ok "Llama 3.1 already downloaded"
 else
@@ -283,19 +296,16 @@ fi
 # ════════════════════════════════════════════════════════════════════════════
 step 7 "System Configuration"
 
-# IP forwarding (required for traffic monitoring)
 echo 1 > /proc/sys/net/ipv4/ip_forward
 grep -q "net.ipv4.ip_forward=1" /etc/sysctl.conf 2>/dev/null || \
   echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
 ok "IP forwarding enabled"
 
-# Disable WiFi power-save (reduces monitoring overhead)
 WIFI_IFACE=$(iw dev 2>/dev/null | awk '/Interface/{print $2}' | head -1)
 [[ -n "$WIFI_IFACE" ]] && \
   iw dev "$WIFI_IFACE" set power_save off 2>/dev/null && \
   ok "Wi-Fi power-save disabled on $WIFI_IFACE"
 
-# Git safe directory
 command -v git &>/dev/null && \
   sudo -u "$REAL_USER" git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
 
@@ -349,7 +359,7 @@ for i in \$(seq 1 15); do
   curl -sf http://localhost:3000 > /dev/null 2>&1 && break; sleep 1
 done
 
-# Start Ollama if not running
+# Start Ollama if not already running
 curl -sf http://localhost:11434/api/tags > /dev/null 2>&1 || {
   su - $REAL_USER -c "nohup ollama serve > /tmp/ollama.log 2>&1 &" 2>/dev/null || true
   sleep 3
@@ -460,6 +470,7 @@ echo "  ║     1. Enter your password when prompted                  ║"
 echo "  ║     2. Click  Initialize  to scan your network            ║"
 echo "  ║     3. Click  ▶ Start  to begin monitoring                ║"
 echo "  ║     4. Open http://localhost:3000 for Grafana charts      ║"
+echo "  ║     5. Link your cloud account (Email + Password)         ║"
 echo "  ║                                                           ║"
 echo "  ╚═══════════════════════════════════════════════════════════╝"
 echo -e "${RESET}"
