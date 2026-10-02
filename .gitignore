@@ -1,10 +1,4 @@
-# Build tools — stay on developer machine only
-installer.py
-build.sh
-cython_protect.sh
-
-# Build artefacts
-netmind-app*.tar.gz
+# PyInstaller build artefacts
 dist/
 build/
 *.spec
