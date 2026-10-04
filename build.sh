@@ -11,6 +11,8 @@ INSTALLER="$SCRIPT_DIR/installer.py"
 PROTECT="$SCRIPT_DIR/cython_protect.sh"
 PROTECTED_DIR="/tmp/netmind-protected"
 UNINSTALLER_SRC="/opt/netmind/uninstaller.py"
+BUILD_WORK="/tmp/netmind-pyi-build"
+BUILD_DIST="$SCRIPT_DIR/dist"
 
 # ── Preflight checks ──────────────────────────────────────────────────────────
 [[ -f "$INSTALLER"       ]] || { echo "ERROR: installer.py not found at $INSTALLER"; exit 1; }
@@ -42,22 +44,23 @@ if ! python3 -c "import PyInstaller" 2>/dev/null; then
 fi
 
 # ── Clean previous build ──────────────────────────────────────────────────────
-rm -rf "$SCRIPT_DIR/dist" "$SCRIPT_DIR/build" \
+rm -rf "$BUILD_WORK" "$BUILD_DIST" \
        "$SCRIPT_DIR/NetMind-Setup.spec" "$SCRIPT_DIR/NetMind-Uninstaller.spec" 2>/dev/null || true
+mkdir -p "$BUILD_WORK" "$BUILD_DIST"
 
 # ── Build uninstaller binary (self-contained, no Python needed on target) ─────
 echo "Building NetMind-Uninstaller (standalone binary)..."
 pyinstaller \
   --onefile \
   --name "NetMind-Uninstaller" \
-  --distpath "$SCRIPT_DIR/dist" \
-  --workpath "$SCRIPT_DIR/build" \
+  --distpath "$BUILD_DIST" \
+  --workpath "$BUILD_WORK/uninstaller" \
   --specpath "$SCRIPT_DIR" \
   --strip \
   --clean \
   "$UNINSTALLER_SRC"
 
-UNINSTALLER_BIN="$SCRIPT_DIR/dist/NetMind-Uninstaller"
+UNINSTALLER_BIN="$BUILD_DIST/NetMind-Uninstaller"
 [[ -f "$UNINSTALLER_BIN" ]] || { echo "ERROR: Uninstaller build failed"; exit 1; }
 chmod +x "$UNINSTALLER_BIN"
 echo "  ✔  Uninstaller built: $(du -sh "$UNINSTALLER_BIN" | cut -f1)"
@@ -78,8 +81,8 @@ echo "Building NetMind-Setup..."
 pyinstaller \
   --onefile \
   --name "NetMind-Setup" \
-  --distpath "$SCRIPT_DIR/dist" \
-  --workpath "$SCRIPT_DIR/build" \
+  --distpath "$BUILD_DIST" \
+  --workpath "$BUILD_WORK/installer" \
   --specpath "$SCRIPT_DIR" \
   --add-data "$TARBALL:." \
   --hidden-import tkinter \
@@ -91,8 +94,8 @@ pyinstaller \
   "$INSTALLER"
 
 # ── Result ────────────────────────────────────────────────────────────────────
-EXE="$SCRIPT_DIR/dist/NetMind-Setup"
-UN="$SCRIPT_DIR/dist/NetMind-Uninstaller"
+EXE="$BUILD_DIST/NetMind-Setup"
+UN="$BUILD_DIST/NetMind-Uninstaller"
 if [[ -f "$EXE" ]]; then
   chmod +x "$EXE"
   echo ""
