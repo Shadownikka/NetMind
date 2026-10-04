@@ -438,7 +438,6 @@ StartupWMClass=NetMindDesktop
             os.chmod(shortcut, 0o755)
             try: shutil.chown(shortcut, real_user, real_user)
             except Exception: pass
-            # Mark as trusted so GNOME shows it as launchable (not greyed-out)
             subprocess.run(
                 ["sudo", "-u", real_user, "gio", "set", shortcut,
                  "metadata::trusted", "true"],
@@ -448,6 +447,61 @@ StartupWMClass=NetMindDesktop
         else:
             self.log(f"  Desktop folder not found — skipping shortcut", "warn")
         self.log("  App menu entry created", "ok")
+
+        # ── Uninstaller launcher & desktop entry ──────────────────────────────
+        uninstaller_launcher = (
+            "#!/bin/bash\n"
+            "# NetMind uninstaller — runs as root via pkexec\n"
+            f'export DISPLAY="${{DISPLAY:-:0}}"\n'
+            f'export XAUTHORITY="${{XAUTHORITY:-{real_home}/.Xauthority}}"\n'
+            "export QT_X11_NO_MITSHM=1\n"
+            "for sp in /home/*/.local/lib/python*/site-packages; do\n"
+            '  export PYTHONPATH="$sp:${PYTHONPATH}"\ndone\n'
+            f'exec "{install_dir}/uninstaller"\n'
+        )
+        with open("/usr/local/bin/netmind-uninstall", "w") as f:
+            f.write(uninstaller_launcher)
+        os.chmod("/usr/local/bin/netmind-uninstall", 0o755)
+
+        os.makedirs("/usr/share/polkit-1/actions", exist_ok=True)
+        with open("/usr/share/polkit-1/actions/com.netmind.uninstall.policy", "w") as f:
+            f.write("""\
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <action id="com.netmind.uninstall">
+    <description>Uninstall NetMind AI Network Manager</description>
+    <message>NetMind Uninstaller needs administrator access to remove application files.</message>
+    <icon_name>netmind</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/bin/netmind-uninstall</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+</policyconfig>""")
+
+        with open("/usr/share/applications/netmind-uninstall.desktop", "w") as f:
+            f.write("""\
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=NetMind Uninstaller
+GenericName=Uninstall NetMind
+Comment=Remove NetMind AI Network Manager from your system
+Exec=pkexec /usr/local/bin/netmind-uninstall
+Icon=netmind
+Terminal=false
+Categories=Network;System;
+StartupNotify=true
+""")
+        os.chmod("/usr/share/applications/netmind-uninstall.desktop", 0o644)
+        subprocess.run(["update-desktop-database", "/usr/share/applications/"], capture_output=True)
+        self.log("  Uninstaller installed", "ok")
 
     # ── Step 9 ────────────────────────────────────────────────────────────────
     def health_check(self):

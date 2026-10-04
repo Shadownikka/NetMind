@@ -82,12 +82,35 @@ rm -f "$MAIN_C" "$MAIN_PY"
 chmod +x "$MAIN_BIN"
 echo "  ✔  NetMindDesktop (binary)"
 
+# ── Compile uninstaller as embedded binary ────────────────────────────────────
+echo ""
+echo "Compiling uninstaller (embedded binary)..."
+UN_PY="$OUT/uninstaller.py"
+UN_C="$OUT/uninstaller.c"
+UN_BIN="$OUT/uninstaller"
+
+if [ -f "$UN_PY" ]; then
+  cython --3str --embed "$UN_PY" -o "$UN_C" 2>/dev/null
+  gcc -O2 \
+      -I"$PY_INC" \
+      -o "$UN_BIN" \
+      "$UN_C" \
+      -L"$PY_LIB" -Wl,-rpath,"$PY_LIB" \
+      -lpython"$PY_VER" -lpthread -ldl -lm -lutil 2>/dev/null
+  rm -f "$UN_C" "$UN_PY"
+  chmod +x "$UN_BIN"
+  echo "  ✔  uninstaller (binary)"
+else
+  echo "  ⚠  uninstaller.py not found — skipping"
+fi
+
 # ── Result ────────────────────────────────────────────────────────────────────
 echo ""
 echo "Protected files in $OUT:"
-find "$OUT" \( -name "*.so" -o -name "NetMindDesktop" -o -name "*.sh" \
-              -o -name "*.txt" -o -name "*.yml" -o -name "*.json" \
-              -o -name "*.png" \) | grep -v "__pycache__" | sort | sed 's|^|  |'
+find "$OUT" \( -name "*.so" -o -name "NetMindDesktop" -o -name "uninstaller" \
+              -o -name "*.sh" -o -name "*.txt" -o -name "*.yml" \
+              -o -name "*.json" -o -name "*.png" \) \
+  | grep -v "__pycache__" | sort | sed 's|^|  |'
 echo ""
 echo "  ✔  Protection complete — no .py source files remain"
 echo ""
