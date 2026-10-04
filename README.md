@@ -73,29 +73,31 @@ Mark any device as trusted — it gets excluded from monitoring and control perm
 
 Go to the [**Releases**](../../releases/latest) page and download `NetMind-Setup`.
 
-### Step 2 — Run the installer *(one time only)*
+### Step 2 — Allow it to run *(one time only)*
 
-Open a terminal in the folder where you downloaded the file and run:
+Right-click `NetMind-Setup` → **Properties** → **Permissions** → check **"Allow executing as file"**
 
-```bash
-sudo -E ./NetMind-Setup
-```
+> On some file managers this option is called **"Allow this file to run as a program"**
 
-The setup wizard opens and handles everything automatically:
+### Step 3 — Double-click it
+
+Double-click `NetMind-Setup` — a password dialog will appear, enter your password, and the installer opens automatically. No terminal needed.
+
+The setup wizard handles everything:
 
 | Step | What happens |
 |------|-------------|
 | 1 | Detects your Linux distribution |
 | 2 | Installs all system packages |
-| 3 | Installs Python dependencies |
-| 4 | Installs Docker + Docker Compose |
-| 5 | Installs Ollama (local AI runtime) |
-| 6 | Downloads the Llama 3.1 AI model (~4.9 GB) |
-| 7 | Installs the NetMind application |
-| 8 | Creates desktop icon and app menu entry |
+| 3 | Installs NetMind application files |
+| 4 | Installs Python dependencies |
+| 5 | Installs Docker + Docker Compose |
+| 6 | Installs Ollama + downloads Llama 3.1 AI model (~4.9 GB) |
+| 7 | System configuration (IP forwarding, Wi-Fi power-save) |
+| 8 | Creates desktop icon, app menu entry, and uninstaller |
 | 9 | Health check |
 
-### Step 3 — Double-click to launch *(from now on, always)*
+### Step 4 — Double-click to launch *(from now on, always)*
 
 After installation, **NetMind appears on your Desktop**. Just double-click it — no terminal needed ever again.
 
@@ -103,9 +105,15 @@ After installation, **NetMind appears on your Desktop**. Just double-click it �
 
 ## 🖱️ Using the App
 
+### Login
+
+NetMind uses a free account to enable cloud sync and remote management. On first launch you will be asked to sign in or create an account at [netmindweb.onrender.com](https://netmindweb.onrender.com).
+
+> Your login is protected — after 3 failed attempts the sign-in is temporarily locked to prevent brute force access.
+
 ### First Launch — Onboarding
 
-The first time you open NetMind, the **AI Onboarding Wizard** asks you to describe your network goals in plain English:
+After signing in, the **AI Onboarding Wizard** asks you to describe your network goals in plain English:
 
 > *"I run a coffee shop. Give customers fast WiFi. My office PC gets priority. Limit any single device to 20 Mbps."*
 
@@ -234,6 +242,23 @@ sudo bash /opt/netmind/stop.sh
 
 ---
 
+## 🗑️ Uninstalling
+
+The installer places a **NetMind Uninstaller** entry in your application menu. Click it, enter your password, and the wizard removes everything — no terminal needed.
+
+**What gets removed:**
+- NetMind application files (`/opt/netmind`)
+- Desktop shortcuts and icons
+- Launch scripts and privilege policies
+- Grafana / Prometheus observability stack
+
+**Optional removals** (you choose during uninstall):
+- Saved account data
+- Ollama + Llama 3.1 AI model (~4.9 GB freed)
+- Docker and all containers
+
+---
+
 ## 🪟 Windows
 
 > **🚧 Windows version is currently under construction.**
@@ -245,7 +270,7 @@ sudo bash /opt/netmind/stop.sh
 ## ❓ FAQ
 
 **Q: Does my data go anywhere?**
-No. Everything runs on your machine. The AI is local (Ollama). No telemetry, no cloud sync, no data leaves your network.
+The AI runs 100% locally on your machine (Ollama — no external API calls). NetMind does sync network snapshots (device IPs, speeds, actions) to our backend to enable remote management via the web dashboard. No traffic content is ever intercepted or transmitted. You can use NetMind fully offline — cloud sync simply won't connect.
 
 **Q: Will devices notice anything is different?**
 No. Their internet continues normally. NetMind is invisible to regular users and devices.
