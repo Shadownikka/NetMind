@@ -12,7 +12,7 @@ PROTECT="$SCRIPT_DIR/cython_protect.sh"
 PROTECTED_DIR="/tmp/netmind-protected"
 UNINSTALLER_SRC="/opt/netmind/uninstaller.py"
 BUILD_WORK="/tmp/netmind-pyi-build"
-BUILD_DIST="$SCRIPT_DIR/dist"
+BUILD_DIST="/tmp/netmind-pyi-dist"
 
 # ── Preflight checks ──────────────────────────────────────────────────────────
 [[ -f "$INSTALLER"       ]] || { echo "ERROR: installer.py not found at $INSTALLER"; exit 1; }
@@ -46,6 +46,8 @@ fi
 # ── Clean previous build ──────────────────────────────────────────────────────
 rm -rf "$BUILD_WORK" "$BUILD_DIST" \
        "$SCRIPT_DIR/NetMind-Setup.spec" "$SCRIPT_DIR/NetMind-Uninstaller.spec" 2>/dev/null || true
+# Also wipe project dist/ in case it's root-owned from a previous sudo run
+rm -rf "$SCRIPT_DIR/dist" 2>/dev/null || true
 mkdir -p "$BUILD_WORK" "$BUILD_DIST"
 
 # ── Build uninstaller binary (self-contained, no Python needed on target) ─────
@@ -93,19 +95,21 @@ pyinstaller \
   --clean \
   "$INSTALLER"
 
-# ── Result ────────────────────────────────────────────────────────────────────
+# ── Copy outputs to project dist/ ────────────────────────────────────────────
 EXE="$BUILD_DIST/NetMind-Setup"
 UN="$BUILD_DIST/NetMind-Uninstaller"
-if [[ -f "$EXE" ]]; then
-  chmod +x "$EXE"
-  echo ""
-  echo "  ✔  dist/NetMind-Setup        $(du -sh "$EXE" | cut -f1)  — installer"
-  echo "  ✔  dist/NetMind-Uninstaller  $(du -sh "$UN"  | cut -f1)  — bundled inside installer tarball"
-  echo ""
-  echo "  Upload to GitHub Releases:  dist/NetMind-Setup"
-  echo "  Users install with:         sudo -E ./NetMind-Setup"
-  echo "  Uninstaller runs on double-click (no terminal needed)"
-else
-  echo "ERROR: Build failed — dist/NetMind-Setup not found."
-  exit 1
-fi
+[[ -f "$EXE" ]] || { echo "ERROR: Build failed — NetMind-Setup not found."; exit 1; }
+
+mkdir -p "$SCRIPT_DIR/dist"
+cp "$EXE" "$SCRIPT_DIR/dist/NetMind-Setup"
+cp "$UN"  "$SCRIPT_DIR/dist/NetMind-Uninstaller"
+chmod +x "$SCRIPT_DIR/dist/NetMind-Setup" "$SCRIPT_DIR/dist/NetMind-Uninstaller"
+
+# ── Result ────────────────────────────────────────────────────────────────────
+echo ""
+echo "  ✔  dist/NetMind-Setup        $(du -sh "$SCRIPT_DIR/dist/NetMind-Setup"        | cut -f1)  — installer"
+echo "  ✔  dist/NetMind-Uninstaller  $(du -sh "$SCRIPT_DIR/dist/NetMind-Uninstaller"  | cut -f1)  — bundled inside installer tarball"
+echo ""
+echo "  Upload to GitHub Releases:  dist/NetMind-Setup"
+echo "  Users install with:         sudo -E ./NetMind-Setup"
+echo "  Uninstaller runs on double-click (no terminal needed)"
