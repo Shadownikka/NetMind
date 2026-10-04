@@ -195,8 +195,10 @@ class InstallWorker(QThread):
             p = os.path.join(self.install_dir, fname)
             if os.path.exists(p):
                 os.chmod(p, 0o755)
-        if not os.path.exists(os.path.join(self.install_dir, "NetMindDesktop.py")):
-            raise RuntimeError("NetMindDesktop.py not found after extraction")
+        has_bin = os.path.exists(os.path.join(self.install_dir, "NetMindDesktop"))
+        has_py  = os.path.exists(os.path.join(self.install_dir, "NetMindDesktop.py"))
+        if not has_bin and not has_py:
+            raise RuntimeError("NetMindDesktop not found after extraction")
         self.log(f"  App files ready at {self.install_dir}", "ok")
 
     # ── Step 4 ────────────────────────────────────────────────────────────────
@@ -372,7 +374,11 @@ class InstallWorker(QThread):
             f'  su - {real_user} -c "nohup ollama serve > /tmp/ollama.log 2>&1 &" 2>/dev/null || true\n'
             "  sleep 3\n}\n\n"
             'cd "$INSTALL_DIR"\n'
-            f'exec python3 -B "{install_dir}/NetMindDesktop.py"\n'
+            f'if [ -x "{install_dir}/NetMindDesktop" ]; then\n'
+            f'  exec "{install_dir}/NetMindDesktop"\n'
+            f'else\n'
+            f'  exec python3 -B "{install_dir}/NetMindDesktop.py"\n'
+            f'fi\n'
         )
         with open(LAUNCHER_BIN, "w") as f:
             f.write(launcher)
@@ -457,7 +463,11 @@ StartupWMClass=NetMindDesktop
             "export QT_X11_NO_MITSHM=1\n"
             "for sp in /home/*/.local/lib/python*/site-packages; do\n"
             '  export PYTHONPATH="$sp:${PYTHONPATH}"\ndone\n'
-            f'exec "{install_dir}/uninstaller"\n'
+            f'if [ -x "{install_dir}/uninstaller" ]; then\n'
+            f'  exec "{install_dir}/uninstaller"\n'
+            f'else\n'
+            f'  exec python3 -B "{install_dir}/uninstaller.py"\n'
+            f'fi\n'
         )
         with open("/usr/local/bin/netmind-uninstall", "w") as f:
             f.write(uninstaller_launcher)
@@ -517,8 +527,10 @@ StartupNotify=true
             ("Docker Compose",   ["docker", "compose", "version"]),
             ("Ollama API",
              ["curl", "-sf", "http://localhost:11434/api/tags"]),
-            ("NetMindDesktop.py",
-             ["test", "-f", os.path.join(self.install_dir, "NetMindDesktop.py")]),
+            ("NetMindDesktop",
+             ["sh", "-c",
+              f'test -x "{self.install_dir}/NetMindDesktop" || '
+              f'test -f "{self.install_dir}/NetMindDesktop.py"']),
             ("Launcher",         ["test", "-x", LAUNCHER_BIN]),
             ("Desktop entry",
              ["test", "-f", "/usr/share/applications/netmind.desktop"]),
