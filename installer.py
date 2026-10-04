@@ -959,12 +959,13 @@ class MainWindow(QMainWindow):
 
     def _launch_now(self):
         real_home = get_real_home()
+        env = os.environ.copy()
+        env["DISPLAY"]    = os.environ.get("DISPLAY", ":0")
+        env["XAUTHORITY"] = os.environ.get("XAUTHORITY", real_home + "/.Xauthority")
         subprocess.Popen(
-            ["pkexec", "env",
-             f"DISPLAY={os.environ.get('DISPLAY', ':0')}",
-             f"XAUTHORITY={os.environ.get('XAUTHORITY', real_home + '/.Xauthority')}",
-             "/usr/local/bin/netmind-launch"],
+            ["/usr/local/bin/netmind-launch"],
             start_new_session=True,
+            env=env,
         )
         self.close()
 
