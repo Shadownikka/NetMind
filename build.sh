@@ -10,11 +10,13 @@ TARBALL="$SCRIPT_DIR/netmind-app.tar.gz"
 INSTALLER="$SCRIPT_DIR/installer.py"
 PROTECT="$SCRIPT_DIR/cython_protect.sh"
 PROTECTED_DIR="/tmp/netmind-protected"
+UNINSTALLER_SRC="/opt/netmind/uninstaller.py"
 
 # ── Preflight checks ──────────────────────────────────────────────────────────
-[[ -f "$INSTALLER" ]] || { echo "ERROR: installer.py not found at $INSTALLER"; exit 1; }
-[[ -f "$PROTECT"   ]] || { echo "ERROR: cython_protect.sh not found at $PROTECT"; exit 1; }
-[[ -d "/opt/netmind" ]] || { echo "ERROR: /opt/netmind not found — app source must exist"; exit 1; }
+[[ -f "$INSTALLER"       ]] || { echo "ERROR: installer.py not found at $INSTALLER"; exit 1; }
+[[ -f "$PROTECT"         ]] || { echo "ERROR: cython_protect.sh not found at $PROTECT"; exit 1; }
+[[ -d "/opt/netmind"     ]] || { echo "ERROR: /opt/netmind not found — app source must exist"; exit 1; }
+[[ -f "$UNINSTALLER_SRC" ]] || { echo "ERROR: uninstaller.py not found at $UNINSTALLER_SRC"; exit 1; }
 
 # ── Source backup (Python files only — no .so binaries) ──────────────────────
 echo "Creating source backup (Python files only)..."
@@ -32,11 +34,6 @@ echo "  Source backup: $(du -sh "$SOURCE_BACKUP" | cut -f1)  →  $SOURCE_BACKUP
 # ── Cython-protect source ─────────────────────────────────────────────────────
 bash "$PROTECT"
 
-# ── Create tarball from protected copy ───────────────────────────────────────
-echo "Creating tarball from protected source..."
-tar -czf "$TARBALL" -C "$PROTECTED_DIR" .
-echo "  Tarball: $(du -sh "$TARBALL" | cut -f1)  →  $TARBALL"
-
 # ── Install PyInstaller if needed ─────────────────────────────────────────────
 if ! python3 -c "import PyInstaller" 2>/dev/null; then
   echo "Installing PyInstaller..."
@@ -45,9 +42,38 @@ if ! python3 -c "import PyInstaller" 2>/dev/null; then
 fi
 
 # ── Clean previous build ──────────────────────────────────────────────────────
-rm -rf "$SCRIPT_DIR/dist" "$SCRIPT_DIR/build" "$SCRIPT_DIR/NetMind-Setup.spec" 2>/dev/null || true
+rm -rf "$SCRIPT_DIR/dist" "$SCRIPT_DIR/build" \
+       "$SCRIPT_DIR/NetMind-Setup.spec" "$SCRIPT_DIR/NetMind-Uninstaller.spec" 2>/dev/null || true
 
-# ── Build ─────────────────────────────────────────────────────────────────────
+# ── Build uninstaller binary (self-contained, no Python needed on target) ─────
+echo "Building NetMind-Uninstaller (standalone binary)..."
+pyinstaller \
+  --onefile \
+  --name "NetMind-Uninstaller" \
+  --distpath "$SCRIPT_DIR/dist" \
+  --workpath "$SCRIPT_DIR/build" \
+  --specpath "$SCRIPT_DIR" \
+  --strip \
+  --clean \
+  "$UNINSTALLER_SRC"
+
+UNINSTALLER_BIN="$SCRIPT_DIR/dist/NetMind-Uninstaller"
+[[ -f "$UNINSTALLER_BIN" ]] || { echo "ERROR: Uninstaller build failed"; exit 1; }
+chmod +x "$UNINSTALLER_BIN"
+echo "  ✔  Uninstaller built: $(du -sh "$UNINSTALLER_BIN" | cut -f1)"
+
+# ── Inject standalone uninstaller into protected dir before creating tarball ──
+echo "Injecting uninstaller binary into protected dir..."
+cp "$UNINSTALLER_BIN" "$PROTECTED_DIR/uninstaller"
+chmod +x "$PROTECTED_DIR/uninstaller"
+echo "  ✔  Injected as $PROTECTED_DIR/uninstaller"
+
+# ── Create tarball from protected copy (now includes standalone uninstaller) ──
+echo "Creating tarball from protected source..."
+tar -czf "$TARBALL" -C "$PROTECTED_DIR" .
+echo "  Tarball: $(du -sh "$TARBALL" | cut -f1)  →  $TARBALL"
+
+# ── Build installer ───────────────────────────────────────────────────────────
 echo "Building NetMind-Setup..."
 pyinstaller \
   --onefile \
@@ -66,14 +92,16 @@ pyinstaller \
 
 # ── Result ────────────────────────────────────────────────────────────────────
 EXE="$SCRIPT_DIR/dist/NetMind-Setup"
+UN="$SCRIPT_DIR/dist/NetMind-Uninstaller"
 if [[ -f "$EXE" ]]; then
   chmod +x "$EXE"
-  SIZE=$(du -sh "$EXE" | cut -f1)
   echo ""
-  echo "  ✔  Build complete: $EXE  ($SIZE)"
+  echo "  ✔  dist/NetMind-Setup        $(du -sh "$EXE" | cut -f1)  — installer"
+  echo "  ✔  dist/NetMind-Uninstaller  $(du -sh "$UN"  | cut -f1)  — bundled inside installer tarball"
   echo ""
-  echo "  Distribute the single file: dist/NetMind-Setup"
-  echo "  Users run it with:          sudo -E ./NetMind-Setup"
+  echo "  Upload to GitHub Releases:  dist/NetMind-Setup"
+  echo "  Users install with:         sudo -E ./NetMind-Setup"
+  echo "  Uninstaller runs on double-click (no terminal needed)"
 else
   echo "ERROR: Build failed — dist/NetMind-Setup not found."
   exit 1
