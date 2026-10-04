@@ -4,34 +4,41 @@
 ═══════════════════════════════════════════════════════════════
 
 ── QUICK STATUS ────────────────────────────────────────────────
-Everything is working as of last session. All features below
-are implemented and deployed to /opt/netmind/.
+All features implemented and working. Build pipeline produces two
+binaries: dist/NetMind-Setup (installer) and dist/NetMind-Uninstaller
+(bundled inside the tarball, extracted to /opt/netmind/ on install).
 
-IMPORTANT: /tmp/NetMindDesktop.py and /opt/netmind/NetMindDesktop.py
-are IN SYNC (same md5: 0a141b7166d59708c465d0c7a9d9f697).
-Always edit /tmp/NetMindDesktop.py first, then deploy:
+IMPORTANT: /tmp/NetMindDesktop.py is the MAIN WORKING COPY.
+Always edit there, then deploy:
   sudo cp /tmp/NetMindDesktop.py /opt/netmind/NetMindDesktop.py
 
-Current user has NO saved token (/root/.netmind/api_key does not
-exist), so app will show LoginPage on next launch.
+Same for uninstaller:
+  sudo cp /tmp/uninstaller.py /opt/netmind/uninstaller.py
+
+After ANY edit to files in /opt/netmind/, rebuild before releasing:
+  bash ~/Desktop/NetMind/build.sh
 
 ── KEY WORKING FOLDERS ─────────────────────────────────────────
 
   /tmp/NetMindDesktop.py
     ← MAIN WORKING FILE. Edit this, then sudo cp to deploy.
-       1456 lines. Do NOT edit /opt/netmind/ directly.
+
+  /tmp/uninstaller.py
+    ← Uninstaller working copy. Same rule — edit here, sudo cp.
 
   /opt/netmind/
     ← Installed app root. Files here run live.
-    NetMindDesktop.py       main app (copy of /tmp/ after deploy)
-    NetMindDesktop          stale compiled binary — IGNORED (launch
-                            script now runs python3 directly)
+    NetMindDesktop.py       main app source
+    NetMindDesktop          Cython-compiled binary (launcher tries
+                            binary first, falls back to .py)
+    uninstaller.py          uninstaller source
+    uninstaller             PyInstaller standalone binary (created
+                            by build.sh and bundled in tarball)
     core/                   see below
     assets/netmind.png
     observability/          Docker Prometheus + Grafana stack
 
   /opt/netmind/core/
-    ← All .py source + matching .so compiled files side by side.
     ai.py / .so             Ollama/Llama integration
     autopilot.py / .so      AI decision loop
     cloud_sync.py / .so     cloud account sync (push/poll/token)
@@ -42,49 +49,51 @@ exist), so app will show LoginPage on next launch.
     voice_handler.py / .so  voice input (experimental)
 
   /usr/local/bin/netmind-launch
-    ← Launch script. Runs as root via pkexec.
+    ← Main launcher. Runs as root via pkexec.
+    Smart: tries NetMindDesktop binary first, falls back to python3.
     Key lines:
       export XAUTHORITY="/home/mahdi/.Xauthority"   ← CRITICAL
-      exec python3 -B "$INSTALL_DIR/NetMindDesktop.py"
+      if [ -x "$INSTALL_DIR/NetMindDesktop" ]; then
+        exec "$INSTALL_DIR/NetMindDesktop"
+      else
+        exec python3 -B "$INSTALL_DIR/NetMindDesktop.py"
+      fi
+
+  /usr/local/bin/netmind-uninstall
+    ← Uninstaller launcher. Runs as root via pkexec.
+    Smart: tries uninstaller binary first, falls back to python3.
+    Created by installer, removed by uninstaller.
 
   /home/mahdi/Desktop/netmind.desktop
-    ← Desktop icon file. chmod+x and gio trust'd.
-    Exec=pkexec /usr/local/bin/netmind-launch
-    Icon=netmind
+    ← Desktop icon. Exec=pkexec /usr/local/bin/netmind-launch
 
-  /home/mahdi/Desktop/Netmind git/
-    ← Dev repo (PRIVATE GitHub). Contains build tools.
-    installer.py              wizard source (PyQt6)
+  /home/mahdi/Desktop/NetMind/
+    ← Build repo (this file lives here).
+    installer.py              installer wizard (PyQt6, 9 steps)
+    uninstaller not here      uninstaller lives in /opt/netmind/
     build.sh                  full build pipeline
     cython_protect.sh         Cython protection script
     netmind-app.tar.gz        protected app tarball (for installer)
-    Backend/Backend-_NetmindWeb-main/
-      src/routes/toolProxy.js ← MAIN BACKEND FILE (last edited here)
+    netmind-source-code.tar.gz  Python-only source backup
+    handoff.txt               this file
+
+  /home/mahdi/Desktop/Netmind git/Backend/Backend-_NetmindWeb-main/
+    ← Backend source. Node.js/Express on Render.
+    src/routes/toolProxy.js   main backend routes file
 
   /home/mahdi/Desktop/NetMind-Release/
-    ← Dist folder for public releases.
-    NetMind-Setup             57MB installer binary
+    ← Public release folder. Copy dist/NetMind-Setup here to ship.
+    NetMind-Setup             installer binary (upload to GitHub Release)
     README.md / LICENSE
-
-  /home/mahdi/Desktop/NetMind/
-    ← Public-facing repo folder (this file lives here).
 
 ── BACKEND ─────────────────────────────────────────────────────
   Runtime URL:  https://backend-netmindweb.onrender.com
   Local source: /home/mahdi/Desktop/Netmind git/Backend/Backend-_NetmindWeb-main/
   GitHub:       https://github.com/Shadownikka/Backend-_NetmindWeb.git
 
-  PENDING: last backend commit (d5c05c7) was made locally but NOT
-  pushed to GitHub yet. Run this to deploy the device-display fix:
+  PENDING: commit d5c05c7 still NOT pushed to GitHub (device-display fix).
     cd "/home/mahdi/Desktop/Netmind git/Backend/Backend-_NetmindWeb-main"
     git push origin main
-  That commit removes the free-tier 5-device truncation from
-  GET /api/tool/devices so the web dashboard shows ALL devices.
-
-  Backend git log (top 3):
-    d5c05c7  fix: show all devices regardless of plan  ← NOT PUSHED
-    9b1288c  Add /api/tool/plan endpoint
-    0655817  Fix contact email replyTo
 
   Key API endpoints:
     POST /api/tool/register-auto   login/signup → returns token
@@ -95,168 +104,163 @@ exist), so app will show LoginPage on next launch.
     GET  /api/tool/events          command history
 
 ── APP ARCHITECTURE (NetMindDesktop.py) ────────────────────────
-  Constants (lines 265-266):
+  Constants (top of file):
     WEBSITE_URL = 'https://netmind.storephoenix94.workers.dev'
     BACKEND_URL = 'https://backend-netmindweb.onrender.com'
+    LOCK_FILE   = '/tmp/netmind-app.lock'
 
   Page classes:
-    LoginPage      line 268   login/signup, emits logged_in signal
-    OnboardingPage line 396   natural language network setup wizard
-    DashboardPage  line 545   main app view
+    LoginPage      line ~268   login/signup, emits logged_in signal
+                               brute force: lockout after 3 failures
+                               lockout: 10s → 20s → 40s → max 60s
+    OnboardingPage line ~396   natural language network setup wizard
+    DashboardPage  line ~545   main app view
 
-  NetMindWindow  line 1255   QMainWindow, owns the QStackedWidget
-    stack index 0 = login_page   (line 1285)
-    stack index 1 = ob_page      (line 1286)
-    stack index 2 = dash_page    (line 1287)
+  NetMindWindow  QMainWindow, owns the QStackedWidget
+    stack index 0 = login_page
+    stack index 1 = ob_page
+    stack index 2 = dash_page
 
-  Routing logic (in __init__, ~line 1295):
-    if load_api_key():        → already logged in
-      if load_profile():      → _show_dashboard(profile)  → index 2
-      else:                   → _go_onboarding()           → index 1
-    else:                     → _go_login()                → index 0
+  Routing logic (_on_logged_in):
+    load_profile() → if None: create default profile, go to dashboard
+    (never forces onboarding on missing profile — prevents fake "fail")
 
-  Key methods in NetMindWindow:
-    _go_login()        line 1310   show login page
-    _on_logged_in()    line 1322   after login: push token to dash,
-                                   fetch profile, go to dash/onboard
-    _on_logout()       line 1314   clear login fields, go to index 0
-    _go_onboarding()   line 1335
-    _show_dashboard()  line 1342
-    _quit(self, _=None) line 1399  _=None needed (QAction sends bool)
+  Single-instance enforcement (main()):
+    _acquire_lock() checks /tmp/netmind-app.lock
+    If already running → shows popup "NetMind is already running."
+    atexit.register(_release_lock) cleans up on normal exit
 
-── CLOUD SYNC DETAILS ──────────────────────────────────────────
+  Stop monitoring (_stop()):
+    Clears device table UI (tbl.setRowCount(0))
+    Keeps self.devices intact — restart resumes with known devices
+    Resets speed/limit/block stat labels to zero
+
+── CLOUD SYNC ──────────────────────────────────────────────────
   DashboardPage._cloud_sync = CloudSync(server_url=BACKEND_URL)
-  Created at line 561 in DashboardPage.__init__.
-  CloudSync.__init__ calls load_api_key() automatically → token ready.
-
-  set_profile() line 1095:
-    - Starts cloud sync early (before network init) so status shows fast
-    - Creates _status_poll_timer (QTimer, main thread) that fires every 2s
-    - Timer calls _poll_cloud_status() which reads _cloud_sync.status
-      and calls _on_sync_status() → updates the label directly
-    - THIS is why the status label updates correctly (background thread
-      callback was unreliable; polling from main thread fixes it)
-
-  _poll_cloud_status() line 1105:
-    def _poll_cloud_status(self):
-        if self._cloud_sync:
-            self._on_sync_status(self._cloud_sync.status)
-
-  Sign Out button in Cloud Sync card:
-    _do_signout() line 1062: stops sync, deletes token, emits
-    request_logout signal → NetMindWindow._on_logout()
+  set_profile() starts sync early + creates _status_poll_timer (2s, main thread)
+  Timer calls _poll_cloud_status() → reads _cloud_sync.status → updates label
+  (Background thread callbacks were unreliable; main-thread polling fixes it)
 
 ── TIER / PLAN SYSTEM ──────────────────────────────────────────
-  Plan fetched on startup, stored via dash_page.set_plan(plan_id).
-  set_plan() line 1143: styles locked features with gray overlay
-    (does NOT use setEnabled(False) — uses CSS opacity trick).
-
-  Free tier limits enforced in DashboardPage:
-    _enforce_device_limit(new_ip) line 1122:
-      - Called before every block/limit action (_ov_block, _ov_limit)
-      - Max 5 devices in controller.limits (the controlled set)
-      - FIFO: oldest device auto-evicted when 6th is added
-      - Does NOT affect self._devices (all discovered devices — unlimited)
-
-    _show_upgrade_popup(feature) line 1114:
-      - Called when free user clicks a locked feature
-      - Shows QMessageBox with upgrade prompt
-
-    _is_paid() line ~1112:
-      - Returns True if plan_id not in ('free', '', None)
-
-  Features gated for free tier: Grafana, Autopilot, AI Chat, Reconfigure.
+  Free tier: max 5 controlled devices (FIFO eviction)
+  Gated features: Grafana, Autopilot, AI Chat, Reconfigure
+  set_plan() uses CSS opacity trick (not setEnabled) for locked features
 
 ── AUTH & FILE PATHS (app runs as root) ─────────────────────────
-  App runs as root via pkexec. All root paths:
-    Token file:    /root/.netmind/api_key   (Fernet-encrypted)
-    XAUTHORITY:    /home/mahdi/.Xauthority  (NOT /root/.Xauthority)
-    Home for root: /root/
+  Token file:    /root/.netmind/api_key   (Fernet-encrypted)
+  Profile file:  /root/.netmind_profile.json
+  XAUTHORITY:    /home/mahdi/.Xauthority  (NOT /root/.Xauthority)
 
-  To force re-login (wipe saved token):
-    sudo rm /root/.netmind/api_key
-
-  load_api_key() is in /opt/netmind/core/cloud_sync.py
-  load_profile() is in /opt/netmind/core/onboarding.py
+  To force re-login:  sudo rm /root/.netmind/api_key
+  To reset profile:   sudo rm /root/.netmind_profile.json
 
 ── LAUNCH FLOW ─────────────────────────────────────────────────
   1. User double-clicks ~/Desktop/netmind.desktop
-  2. pkexec prompts for password, runs /usr/local/bin/netmind-launch as root
+  2. pkexec prompts for password → runs /usr/local/bin/netmind-launch as root
   3. Launch script:
      a. Sets DISPLAY=:0, XAUTHORITY=/home/mahdi/.Xauthority
      b. Starts Docker (observability stack)
-     c. Starts Ollama if not running (as user mahdi via su)
-     d. exec python3 -B /opt/netmind/NetMindDesktop.py
-  4. App shows LoginPage OR DashboardPage depending on saved token
+     c. Starts Ollama (as user mahdi via su)
+     d. exec NetMindDesktop binary (or python3 fallback)
+  4. main() checks lock file → single-instance guard
+  5. App shows LoginPage OR DashboardPage depending on saved token
 
 ── BUILD PIPELINE ──────────────────────────────────────────────
-  cd ~/Desktop/Netmind\ git
+  cd ~/Desktop/NetMind
   bash build.sh
 
-  build.sh:
-    1. Runs cython_protect.sh → compiles /opt/netmind to
-       /tmp/netmind-protected (all .py → .so via Cython)
-    2. Creates netmind-app.tar.gz from protected copy
-    3. PyInstaller on installer.py → dist/NetMind-Setup (57MB)
+  build.sh steps:
+    1. Source backup (Python-only → netmind-source-code.tar.gz)
+    2. cython_protect.sh → /tmp/netmind-protected
+       (core/*.py → .so, NetMindDesktop.py → binary)
+    3. Install PyInstaller if needed
+    4. PyInstaller on uninstaller.py → /tmp/netmind-pyi-dist/NetMind-Uninstaller
+    5. Inject uninstaller binary into /tmp/netmind-protected/
+    6. tar /tmp/netmind-protected → netmind-app.tar.gz
+    7. PyInstaller on installer.py → dist/NetMind-Setup
+    8. Copy both binaries to dist/
+
+  All PyInstaller temp work goes to /tmp/netmind-pyi-build/ and
+  /tmp/netmind-pyi-dist/ — never needs sudo.
 
   After build:
-    cp dist/NetMind-Setup ~/Desktop/NetMind-Release/
-    # then upload to GitHub Releases
+    cp ~/Desktop/NetMind/dist/NetMind-Setup ~/Desktop/NetMind-Release/
+    # then upload NetMind-Release/NetMind-Setup to GitHub Releases
 
 ── INSTALLER (installer.py) ────────────────────────────────────
-  9-step wizard:
+  9-step wizard (user picks install folder on step 2):
     1. Detect distro
     2. System packages (apt/dnf/pacman)
-    3. Extract /opt/netmind (protected binaries)
+    3. Extract app tarball (contains .so + binaries + uninstaller binary)
     4. Python deps (requirements.txt)
     5. Docker + Docker Compose
     6. Ollama + pull Llama 3.1 (~4.9 GB)
     7. System config (IP forwarding, WiFi power-save)
-    8. Desktop entry, icon, launcher, polkit policy
+    8. Desktop entry, icon, launcher, polkit policy, uninstaller launcher
     9. Health check
 
-── DESKTOP ICON ────────────────────────────────────────────────
-  File: /home/mahdi/Desktop/netmind.desktop
-  To recreate if lost:
-    cat > ~/Desktop/netmind.desktop << 'EOF'
-    [Desktop Entry]
-    Version=1.0
-    Type=Application
-    Name=NetMind
-    GenericName=AI Network Manager
-    Exec=pkexec /usr/local/bin/netmind-launch
-    Icon=netmind
-    Terminal=false
-    Categories=Network;System;Security;
-    StartupNotify=true
-    StartupWMClass=NetMindDesktop
+  Launcher scripts written by installer use smart fallback:
+    binary first → python3 fallback (works on both fresh installs
+    with Cython binary and dev setups with .py source)
+
+  "Launch NetMind Now" button (finish page):
+    Runs /usr/local/bin/netmind-launch directly (NOT via pkexec —
+    installer is already root, pkexec-in-root fails silently)
+
+── UNINSTALLER (uninstaller.py) ────────────────────────────────
+  3-page GUI wizard (confirm → uninstalling log → done)
+  Header is RED to distinguish from installer.
+  Optional checkboxes: remove account data, Ollama, Docker.
+
+  What it always removes:
+    /opt/netmind/               app files
+    /usr/local/bin/netmind-launch
+    /usr/local/bin/netmind-uninstall
+    /usr/share/polkit-1/actions/com.netmind.app.policy
+    /usr/share/polkit-1/actions/com.netmind.uninstall.policy
+    /tmp/netmind-app.lock       (lock file cleanup)
+    Desktop entries and icons
+
+  "Remove account data" option also removes:
+    /root/.netmind/             (token + api key)
+    /root/.netmind_profile.json (onboarding profile)
+
+  To test without reinstalling, create launcher manually:
+    sudo bash -c 'cat > /usr/local/bin/netmind-uninstall << EOF
+    #!/bin/bash
+    export DISPLAY="${DISPLAY:-:0}"
+    export XAUTHORITY="${XAUTHORITY:-/home/mahdi/.Xauthority}"
+    export QT_X11_NO_MITSHM=1
+    exec python3 -B /opt/netmind/uninstaller.py
     EOF
-    chmod +x ~/Desktop/netmind.desktop
-    gio set ~/Desktop/netmind.desktop metadata::trusted true
+    chmod +x /usr/local/bin/netmind-uninstall'
 
 ── KNOWN GOTCHAS ───────────────────────────────────────────────
-  • /opt/netmind/NetMindDesktop (binary) is STALE — launch script
-    skips it and runs python3 directly. Don't confuse them.
+  • App runs as root. XAUTHORITY must be /home/mahdi/.Xauthority
+    (not /root/.Xauthority) or the GUI won't display.
 
-  • QAction.triggered emits a bool argument. Any slot connected to
-    it must accept it: def _quit(self, _=None) not def _quit(self).
+  • QAction.triggered emits a bool. Slots must accept it:
+    def _quit(self, _=None) not def _quit(self).
 
-  • App runs as root. Never hardcode /home/mahdi in app code paths
-    unless it's XAUTHORITY or the user's desktop file. Use /root/
-    for app data (/root/.netmind/).
+  • core/ .so files take priority over .py when both exist.
+    To test .py changes in core/: delete the matching .so first.
 
-  • When editing /opt/netmind/core/*.py — those have matching .so
-    files. The app imports whichever Python finds first. Since both
-    exist, .so takes priority. To test .py changes in core/, either
-    delete the .so or do a Cython rebuild.
+  • Backend cold-starts after inactivity (Render free tier).
+    First push may take 15-30s — "connecting" status is normal.
 
-  • Backend (Render free tier) cold-starts after inactivity.
-    First push may take 15-30s. Status shows 'connecting' until
-    it responds — this is normal.
+  • If /opt/netmind gets wiped (e.g. uninstaller test): restore with
+      git show <commit>:netmind-source-code.tar.gz > /tmp/backup.tar.gz
+      sudo tar -xzf /tmp/backup.tar.gz -C /opt/netmind/
+      sudo cp /tmp/NetMindDesktop.py /opt/netmind/NetMindDesktop.py
+      sudo cp /tmp/uninstaller.py /opt/netmind/uninstaller.py
+    Then rebuild: bash ~/Desktop/NetMind/build.sh
 
-  • If cloud sync shows "Checking connection…" still (shouldn't
-    happen now), the _status_poll_timer fix is in set_profile()
-    at line 1095-1107 of NetMindDesktop.py.
+── QUEUED FEATURES ─────────────────────────────────────────────
+  1. Update system — manifest-based delta updates, wizard shows
+     changelog + downloads only changed files, rollback to
+     /opt/netmind.bak/. (Planned for v2.1)
+
+  2. Logo — user will provide image to use as product logo.
 
 ── TECH STACK ──────────────────────────────────────────────────
   Language      Python 3.12
@@ -264,12 +268,12 @@ exist), so app will show LoginPage on next launch.
   AI            Llama 3.1 via Ollama (100% local)
   Monitoring    Prometheus + Grafana (Docker Compose)
   Network       ARP spoofing, iptables, TC/HTB
-  Protection    Cython → .so files (core/) + PyInstaller (installer)
+  Protection    Cython → .so files (core/) + PyInstaller (installer + uninstaller)
   Backend       Node.js/Express, PostgreSQL, hosted on Render
   Auth          Fernet-encrypted token at /root/.netmind/api_key
 
 ── WINDOWS VERSION ─────────────────────────────────────────────
-Not started. README shows "🚧 Windows version is currently under
-construction."
+  Not started. README shows "🚧 Windows version is currently under
+  construction."
 
 ═══════════════════════════════════════════════════════════════
