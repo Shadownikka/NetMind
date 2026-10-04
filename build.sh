@@ -24,8 +24,9 @@ tar -czf "$SOURCE_BACKUP" \
   --exclude="__pycache__" \
   --exclude="*.pyc" \
   --exclude="*.c" \
-  -C "$(dirname /opt/netmind)" \
-  "$(basename /opt/netmind)"
+  --exclude="NetMindDesktop" \
+  -C /opt/netmind \
+  .
 echo "  Source backup: $(du -sh "$SOURCE_BACKUP" | cut -f1)  →  $SOURCE_BACKUP"
 
 # ── Cython-protect source ─────────────────────────────────────────────────────
