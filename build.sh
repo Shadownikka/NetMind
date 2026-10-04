@@ -10,7 +10,7 @@ TARBALL="$SCRIPT_DIR/netmind-app.tar.gz"
 INSTALLER="$SCRIPT_DIR/installer.py"
 PROTECT="$SCRIPT_DIR/cython_protect.sh"
 PROTECTED_DIR="/tmp/netmind-protected"
-UNINSTALLER_SRC="/opt/netmind/uninstaller.py"
+UNINSTALLER_SRC="/tmp/uninstaller.py"
 BUILD_WORK="/tmp/netmind-pyi-build"
 BUILD_DIST="/tmp/netmind-pyi-dist"
 
@@ -18,7 +18,7 @@ BUILD_DIST="/tmp/netmind-pyi-dist"
 [[ -f "$INSTALLER"       ]] || { echo "ERROR: installer.py not found at $INSTALLER"; exit 1; }
 [[ -f "$PROTECT"         ]] || { echo "ERROR: cython_protect.sh not found at $PROTECT"; exit 1; }
 [[ -d "/opt/netmind"     ]] || { echo "ERROR: /opt/netmind not found — app source must exist"; exit 1; }
-[[ -f "$UNINSTALLER_SRC" ]] || { echo "ERROR: uninstaller.py not found at $UNINSTALLER_SRC"; exit 1; }
+[[ -f "$UNINSTALLER_SRC" ]] || { echo "ERROR: uninstaller.py not found at $UNINSTALLER_SRC — make sure /tmp/uninstaller.py exists"; exit 1; }
 
 # ── Source backup (Python files only — no .so binaries) ──────────────────────
 echo "Creating source backup (Python files only)..."
