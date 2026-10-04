@@ -4,11 +4,14 @@
 ═══════════════════════════════════════════════════════════════
 
 ── QUICK STATUS ────────────────────────────────────────────────
-All features implemented and working. Build pipeline produces two
-binaries: dist/NetMind-Setup (installer) and dist/NetMind-Uninstaller
-(bundled inside the tarball, extracted to /opt/netmind/ on install).
+All features implemented and working. v2.0 released on GitHub.
+  https://github.com/Shadownikka/NetMind/releases/latest
 
-Grafana button, sign out, and policy generation all verified working.
+Build pipeline produces two binaries: dist/NetMind-Setup (installer)
+and dist/NetMind-Uninstaller (bundled inside the tarball).
+
+Grafana button, sign out, policy generation, Confirm & Start,
+and Redo all verified working.
 
 IMPORTANT: /tmp/NetMindDesktop.py is the MAIN WORKING COPY.
 Always edit there, then deploy:
@@ -84,9 +87,10 @@ After ANY edit to files in /opt/netmind/, rebuild before releasing:
     src/routes/toolProxy.js   main backend routes file
 
   /home/mahdi/Desktop/NetMind-Release/
-    ← Public release folder. Copy dist/NetMind-Setup here to ship.
+    ← Public release folder. Git remote: https://github.com/Shadownikka/NetMind
     NetMind-Setup             installer binary (upload to GitHub Release)
     README.md / LICENSE
+    Released at: https://github.com/Shadownikka/NetMind/releases/latest
 
 ── BACKEND ─────────────────────────────────────────────────────
   Runtime URL:  https://backend-netmindweb.onrender.com
@@ -162,6 +166,26 @@ After ANY edit to files in /opt/netmind/, rebuild before releasing:
      d. exec NetMindDesktop binary (or python3 fallback)
   4. main() checks lock file → single-instance guard
   5. App shows LoginPage OR DashboardPage depending on saved token
+
+── RELEASE PROCESS ──────────────────────────────────────────────
+  1. Edit /tmp/NetMindDesktop.py (or /tmp/uninstaller.py)
+  2. Deploy:
+       sudo cp /tmp/NetMindDesktop.py /opt/netmind/NetMindDesktop.py
+       sudo cp /tmp/uninstaller.py /opt/netmind/uninstaller.py  (if changed)
+  3. Build:
+       bash ~/Desktop/NetMind/build.sh
+     → auto-copies to ~/Desktop/NetMind-Release/NetMind-Setup
+  4. Push README/LICENSE if changed:
+       cd ~/Desktop/NetMind-Release && git add . && git commit -m "..." && git push
+  5. Create GitHub release:
+       gh release create vX.Y ~/Desktop/NetMind-Release/NetMind-Setup \
+         --title "NetMind vX.Y" --notes "..."
+
+  NOTE: build.sh reads uninstaller source from /tmp/uninstaller.py
+  (not /opt/netmind) so it works after a fresh install with no .py files.
+
+  After any fresh install, rename the stale binary before testing .py fixes:
+    sudo mv /opt/netmind/NetMindDesktop /opt/netmind/NetMindDesktop.old
 
 ── BUILD PIPELINE ──────────────────────────────────────────────
   cd ~/Desktop/NetMind
