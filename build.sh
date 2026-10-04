@@ -106,11 +106,21 @@ cp "$EXE" "$SCRIPT_DIR/dist/NetMind-Setup"
 cp "$UN"  "$SCRIPT_DIR/dist/NetMind-Uninstaller"
 chmod +x "$SCRIPT_DIR/dist/NetMind-Setup" "$SCRIPT_DIR/dist/NetMind-Uninstaller"
 
+# ── Copy to NetMind-Release ───────────────────────────────────────────────────
+RELEASE_DIR="$HOME/Desktop/NetMind-Release"
+if [[ -d "$RELEASE_DIR" ]]; then
+  cp "$SCRIPT_DIR/dist/NetMind-Setup" "$RELEASE_DIR/NetMind-Setup"
+  chmod +x "$RELEASE_DIR/NetMind-Setup"
+  echo "  ✔  Copied to $RELEASE_DIR/NetMind-Setup"
+else
+  echo "  ⚠  $RELEASE_DIR not found — skipping release copy"
+fi
+
 # ── Result ────────────────────────────────────────────────────────────────────
 echo ""
 echo "  ✔  dist/NetMind-Setup        $(du -sh "$SCRIPT_DIR/dist/NetMind-Setup"        | cut -f1)  — installer"
 echo "  ✔  dist/NetMind-Uninstaller  $(du -sh "$SCRIPT_DIR/dist/NetMind-Uninstaller"  | cut -f1)  — bundled inside installer tarball"
 echo ""
-echo "  Upload to GitHub Releases:  dist/NetMind-Setup"
-echo "  Users install with:         sudo -E ./NetMind-Setup"
-echo "  Uninstaller runs on double-click (no terminal needed)"
+echo "  Release folder:   $RELEASE_DIR/NetMind-Setup"
+echo "  Upload that file to GitHub Releases"
+echo "  Users install with:  sudo -E ./NetMind-Setup  (or double-click)"
