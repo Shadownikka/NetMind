@@ -29,6 +29,7 @@ tar -czf "$SOURCE_BACKUP" \
   --exclude="*.pyc" \
   --exclude="*.c" \
   --exclude="NetMindDesktop" \
+  --exclude="uninstaller" \
   -C /opt/netmind \
   .
 echo "  Source backup: $(du -sh "$SOURCE_BACKUP" | cut -f1)  →  $SOURCE_BACKUP"
