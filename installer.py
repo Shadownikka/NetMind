@@ -195,8 +195,8 @@ class InstallWorker(QThread):
             p = os.path.join(self.install_dir, fname)
             if os.path.exists(p):
                 os.chmod(p, 0o755)
-        if not os.path.exists(os.path.join(self.install_dir, "NetMindDesktop")):
-            raise RuntimeError("NetMindDesktop binary not found after extraction")
+        if not os.path.exists(os.path.join(self.install_dir, "NetMindDesktop.py")):
+            raise RuntimeError("NetMindDesktop.py not found after extraction")
         self.log(f"  App files ready at {self.install_dir}", "ok")
 
     # ── Step 4 ────────────────────────────────────────────────────────────────
@@ -372,7 +372,7 @@ class InstallWorker(QThread):
             f'  su - {real_user} -c "nohup ollama serve > /tmp/ollama.log 2>&1 &" 2>/dev/null || true\n'
             "  sleep 3\n}\n\n"
             'cd "$INSTALL_DIR"\n'
-            f'exec "{install_dir}/NetMindDesktop"\n'
+            f'exec python3 -B "{install_dir}/NetMindDesktop.py"\n'
         )
         with open(LAUNCHER_BIN, "w") as f:
             f.write(launcher)
@@ -463,8 +463,8 @@ StartupWMClass=NetMindDesktop
             ("Docker Compose",   ["docker", "compose", "version"]),
             ("Ollama API",
              ["curl", "-sf", "http://localhost:11434/api/tags"]),
-            ("NetMindDesktop",
-             ["test", "-x", os.path.join(self.install_dir, "NetMindDesktop")]),
+            ("NetMindDesktop.py",
+             ["test", "-f", os.path.join(self.install_dir, "NetMindDesktop.py")]),
             ("Launcher",         ["test", "-x", LAUNCHER_BIN]),
             ("Desktop entry",
              ["test", "-f", "/usr/share/applications/netmind.desktop"]),
@@ -866,7 +866,7 @@ class MainWindow(QMainWindow):
                 "  3.  Click  Initialize  to scan your network\n\n"
                 "  4.  Click  ▶ Start  to begin monitoring\n\n"
                 "  5.  Open  http://localhost:3000  for Grafana charts\n\n"
-                "  6.  Link your cloud account  (Email + Password)"
+                "  6.  Sign in with your NetMind account when prompted"
             )
             self._label(w, steps, 11, color=MUTED).setGeometry(40, 72, 620, 280)
         else:
@@ -892,15 +892,12 @@ class MainWindow(QMainWindow):
         self._goto(self.PAGE_FINISH, sub)
 
     def _launch_now(self):
-        real_user   = get_real_user()
-        real_home   = get_real_home()
-        install_dir = self._install_dir
+        real_home = get_real_home()
         subprocess.Popen(
-            ["sudo", "-u", real_user,
-             "env",
+            ["pkexec", "env",
              f"DISPLAY={os.environ.get('DISPLAY', ':0')}",
              f"XAUTHORITY={os.environ.get('XAUTHORITY', real_home + '/.Xauthority')}",
-             os.path.join(install_dir, "NetMindDesktop")],
+             "/usr/local/bin/netmind-launch"],
             start_new_session=True,
         )
         self.close()

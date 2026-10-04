@@ -16,6 +16,18 @@ PROTECTED_DIR="/tmp/netmind-protected"
 [[ -f "$PROTECT"   ]] || { echo "ERROR: cython_protect.sh not found at $PROTECT"; exit 1; }
 [[ -d "/opt/netmind" ]] || { echo "ERROR: /opt/netmind not found — app source must exist"; exit 1; }
 
+# ── Source backup (Python files only — no .so binaries) ──────────────────────
+echo "Creating source backup (Python files only)..."
+SOURCE_BACKUP="$SCRIPT_DIR/netmind-source-code.tar.gz"
+tar -czf "$SOURCE_BACKUP" \
+  --exclude="*.so" \
+  --exclude="__pycache__" \
+  --exclude="*.pyc" \
+  --exclude="*.c" \
+  -C "$(dirname /opt/netmind)" \
+  "$(basename /opt/netmind)"
+echo "  Source backup: $(du -sh "$SOURCE_BACKUP" | cut -f1)  →  $SOURCE_BACKUP"
+
 # ── Cython-protect source ─────────────────────────────────────────────────────
 bash "$PROTECT"
 
@@ -39,6 +51,9 @@ echo "Building NetMind-Setup..."
 pyinstaller \
   --onefile \
   --name "NetMind-Setup" \
+  --distpath "$SCRIPT_DIR/dist" \
+  --workpath "$SCRIPT_DIR/build" \
+  --specpath "$SCRIPT_DIR" \
   --add-data "$TARBALL:." \
   --hidden-import tkinter \
   --hidden-import tkinter.ttk \
