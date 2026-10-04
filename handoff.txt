@@ -8,6 +8,8 @@ All features implemented and working. Build pipeline produces two
 binaries: dist/NetMind-Setup (installer) and dist/NetMind-Uninstaller
 (bundled inside the tarball, extracted to /opt/netmind/ on install).
 
+Grafana button, sign out, and policy generation all verified working.
+
 IMPORTANT: /tmp/NetMindDesktop.py is the MAIN WORKING COPY.
 Always edit there, then deploy:
   sudo cp /tmp/NetMindDesktop.py /opt/netmind/NetMindDesktop.py
@@ -90,10 +92,6 @@ After ANY edit to files in /opt/netmind/, rebuild before releasing:
   Runtime URL:  https://backend-netmindweb.onrender.com
   Local source: /home/mahdi/Desktop/Netmind git/Backend/Backend-_NetmindWeb-main/
   GitHub:       https://github.com/Shadownikka/Backend-_NetmindWeb.git
-
-  PENDING: commit d5c05c7 still NOT pushed to GitHub (device-display fix).
-    cd "/home/mahdi/Desktop/Netmind git/Backend/Backend-_NetmindWeb-main"
-    git push origin main
 
   Key API endpoints:
     POST /api/tool/register-auto   login/signup → returns token
@@ -239,8 +237,17 @@ After ANY edit to files in /opt/netmind/, rebuild before releasing:
   • App runs as root. XAUTHORITY must be /home/mahdi/.Xauthority
     (not /root/.Xauthority) or the GUI won't display.
 
-  • QAction.triggered emits a bool. Slots must accept it:
+  • QAction.triggered / QPushButton.clicked emit a bool. Slots must accept it:
     def _quit(self, _=None) not def _quit(self).
+
+  • webbrowser.open() silently fails as root — browsers refuse to run as root.
+    All URL-opening uses the module-level _open_url() helper instead.
+    It detects the real user via PKEXEC_UID, then runs:
+      runuser -u <user> -- env DISPLAY=... XAUTHORITY=... xdg-open <url>
+    Never call webbrowser.open() directly anywhere in the app.
+
+  • Grafana is ungated (free + paid). It runs locally in Docker so it can't
+    be truly blocked — the button is available to everyone.
 
   • core/ .so files take priority over .py when both exist.
     To test .py changes in core/: delete the matching .so first.
@@ -261,6 +268,7 @@ After ANY edit to files in /opt/netmind/, rebuild before releasing:
      /opt/netmind.bak/. (Planned for v2.1)
 
   2. Logo — user will provide image to use as product logo.
+     Drop PNG into assets/netmind.png and rebuild.
 
 ── TECH STACK ──────────────────────────────────────────────────
   Language      Python 3.12

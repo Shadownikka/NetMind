@@ -51,7 +51,15 @@ def is_root():
     return os.geteuid() == 0
 
 def get_real_user():
-    return os.environ.get("SUDO_USER") or os.environ.get("USER") or "root"
+    user = os.environ.get("SUDO_USER", "")
+    if not user:
+        uid_str = os.environ.get("PKEXEC_UID")
+        if uid_str:
+            try:
+                user = pwd.getpwuid(int(uid_str)).pw_name
+            except Exception:
+                pass
+    return user or os.environ.get("USER", "root")
 
 def get_real_home():
     try:
