@@ -1,8 +1,10 @@
 {
-  "version": "2.0",
+  "version": "2.1",
   "release_date": "2026-10-05",
   "changelog": [
-    "Initial release"
+    "Update system improvements",
+    "Fixed login page styling",
+    "Fixed URL opening as root"
   ],
-  "update_url": ""
+  "update_url": "https://github.com/Shadownikka/NetMind/releases/download/v2.0/netmind-update-v2.1.tar.gz"
 }
