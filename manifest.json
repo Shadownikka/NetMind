@@ -1,8 +1,11 @@
 {
-  "version": "2.0",
+  "version": "2.1",
   "release_date": "2026-10-05",
   "changelog": [
-    "Initial release"
+    "Fixed Confirm & Start and Redo buttons",
+    "Grafana dashboard accessible on all tiers",
+    "Fixed Create Account redirect URL",
+    "Update system added"
   ],
   "update_url": ""
 }
