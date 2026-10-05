@@ -11,7 +11,7 @@ Build pipeline produces two binaries: dist/NetMind-Setup (installer)
 and dist/NetMind-Uninstaller (bundled inside the tarball).
 
 Grafana button, sign out, policy generation, Confirm & Start,
-and Redo all verified working.
+Redo, and update system all verified working.
 
 IMPORTANT: /tmp/NetMindDesktop.py is the MAIN WORKING COPY.
 Always edit there, then deploy:
@@ -286,12 +286,38 @@ After ANY edit to files in /opt/netmind/, rebuild before releasing:
       sudo cp /tmp/uninstaller.py /opt/netmind/uninstaller.py
     Then rebuild: bash ~/Desktop/NetMind/build.sh
 
-── QUEUED FEATURES ─────────────────────────────────────────────
-  1. Update system — manifest-based delta updates, wizard shows
-     changelog + downloads only changed files, rollback to
-     /opt/netmind.bak/. (Planned for v2.1)
+── UPDATE SYSTEM ────────────────────────────────────────────────
+  Implemented in v2.0. Manifest hosted at:
+    https://raw.githubusercontent.com/Shadownikka/NetMind/main/manifest.json
 
-  2. Logo — user will provide image to use as product logo.
+  How it works:
+    • On every login → silent background check (no UI unless update found)
+    • Green banner appears in dashboard if newer version detected
+    • Manual "Check for Updates" button in Cloud Sync card shows live status
+    • "Update Now" → dialog with changelog + progress bar
+      - Backs up /opt/netmind/ → /opt/netmind.bak/
+      - Downloads delta tarball (changed files only)
+      - Applies over install dir, fixes permissions
+      - "Restart Now" button relaunches via /usr/local/bin/netmind-launch
+
+  To ship a new version (e.g. v2.1):
+    1. Build the changed files into a delta tarball:
+         tar -czf netmind-update-v2.1.tar.gz -C /tmp/netmind-protected \
+           NetMindDesktop core/ai.cpython-*.so   # only changed files
+    2. Upload tarball to GitHub Release as an asset
+    3. Edit manifest.json:
+         "version": "2.1"
+         "changelog": ["what changed", ...]
+         "update_url": "<asset download URL from GitHub Release>"
+    4. Push manifest.json → all logged-in users get the banner
+
+  Constants in NetMindDesktop.py:
+    APP_VERSION  = "2.0"        ← bump this when shipping new binary
+    MANIFEST_URL = "https://raw.githubusercontent.com/Shadownikka/NetMind/main/manifest.json"
+    INSTALL_DIR  = os.path.dirname(os.path.abspath(sys.argv[0]))
+
+── QUEUED FEATURES ─────────────────────────────────────────────
+  1. Logo — user will provide image to use as product logo.
      Drop PNG into assets/netmind.png and rebuild.
 
 ── TECH STACK ──────────────────────────────────────────────────
