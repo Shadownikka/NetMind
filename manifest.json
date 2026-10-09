@@ -1,14 +1,15 @@
 {
-  "version": "2.1.12",
+  "version": "2.1.13",
   "release_date": "2026-10-09",
   "changelog": [
     "Fixed: per-device bandwidth limits no longer collide — each device now gets a unique traffic-control mark (previously two devices could share one mark and silently clobber each other)",
     "Fixed: kernel network settings (reverse-path filter, forwarding tunables, queue length) are now saved on start and fully restored when the app stops",
-    "Fixed: app restart after an update replaces the running process instead of leaving a duplicate behind",
+    "Improved: updating is now more reliable — the app verifies the new version installed before finishing, and always relaunches cleanly instead of leaving a duplicate running",
     "Fixed: paid features now stay locked until your account plan is confirmed",
     "Added: a 'Later' option after an update so you can keep working and restart when ready",
+    "Fixed: leftover backup files are now cleaned from the install folder after each update",
     "Fixed: app logo now shows correctly across all screens (dashboard, AI setup, AutoPilot)",
     "Added: back button on the AI setup page to return to the dashboard"
   ],
-  "update_url": "https://github.com/Shadownikka/NetMind/releases/download/v2.1.12/netmind-update-v2.1.12.tar.gz"
+  "update_url": "https://github.com/Shadownikka/NetMind/releases/download/v2.1.13/netmind-update-v2.1.13.tar.gz"
 }
