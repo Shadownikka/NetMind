@@ -1,15 +1,23 @@
 {
-  "version": "2.1.13",
+  "version": "2.1.2",
   "release_date": "2026-10-09",
   "changelog": [
-    "Fixed: per-device bandwidth limits no longer collide — each device now gets a unique traffic-control mark (previously two devices could share one mark and silently clobber each other)",
-    "Fixed: kernel network settings (reverse-path filter, forwarding tunables, queue length) are now saved on start and fully restored when the app stops",
-    "Improved: updating is now more reliable — the app verifies the new version installed before finishing, and always relaunches cleanly instead of leaving a duplicate running",
+    "Fixed (critical): bandwidth limits now actually throttle a device to the chosen speed instead of cutting off its internet entirely — a leftover traffic-marking rule could clash with other security/firewall software and block all traffic",
+    "Fixed (critical): the app could fail to initialize on some installs because a required component was not packaged into the build — all components are now bundled and verified before shipping",
+    "Fixed: per-device bandwidth limits no longer collide — each device gets its own traffic-control class (previously two devices could clobber each other's limit)",
+    "Fixed: kernel network settings (reverse-path filter, forwarding tunables, transmit queue length) are now saved on start and fully restored when the app stops, instead of leaking",
+    "Improved: updating is more reliable — the app verifies the new version installed before finishing, and relaunches cleanly instead of leaving a duplicate process running",
     "Fixed: paid features now stay locked until your account plan is confirmed",
     "Added: a 'Later' option after an update so you can keep working and restart when ready",
     "Fixed: leftover backup files are now cleaned from the install folder after each update",
-    "Fixed: app logo now shows correctly across all screens (dashboard, AI setup, AutoPilot)",
-    "Added: back button on the AI setup page to return to the dashboard"
+    "Fixed: the app logo now shows correctly across all screens (dashboard, AI setup, AutoPilot)",
+    "Added: a back button on the AI setup page to return to the dashboard",
+    "Fixed: the network monitor no longer freezes the interface when stopping",
+    "Fixed: AutoPilot no longer shows an upgrade popup on free-plan startup",
+    "Fixed: memory leak in the connection tracker during long sessions",
+    "Fixed: firewall (iptables) forwarding rules are now cleaned up properly on stop",
+    "Fixed: a rare crash when closing the app during startup or plan loading",
+    "Security: hardened the installer against malicious update archives (path-traversal protection)"
   ],
-  "update_url": "https://github.com/Shadownikka/NetMind/releases/download/v2.1.13/netmind-update-v2.1.13.tar.gz"
+  "update_url": "https://github.com/Shadownikka/NetMind/releases/download/v2.1.2/netmind-update-v2.1.2.tar.gz"
 }
