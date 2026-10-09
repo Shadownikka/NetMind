@@ -11,5 +11,5 @@
     "Fixed: memory leak in connection tracker for active devices",
     "Fixed: iptables rules now cleaned up properly on stop"
   ],
-  "update_url": "https://github.com/Shadownikka/NetMind/releases/download/v2.1.10/NetMind-Setup"
+  "update_url": "https://github.com/Shadownikka/NetMind/releases/download/v2.1.10/netmind-update-v2.1.10.tar.gz"
 }

@@ -125,6 +125,12 @@ When you double-click the icon, NetMind automatically:
 
 ## 🖱️ Using the App
 
+### Login
+
+NetMind uses a free account to enable cloud sync and remote management from your browser. On first launch, sign in with your NetMind email and password — or [create a free account](https://netmind.storephoenix94.workers.dev/signup.html) first. If two-factor authentication is on, the app asks for your 6-digit code after your password.
+
+> Your login is protected — after 3 failed attempts the sign-in is temporarily locked to prevent brute force access.
+
 ### First Launch — Onboarding
 
 The first time you open NetMind, the **AI Onboarding Wizard** asks you to describe your network goals in plain English:
@@ -474,6 +480,6 @@ Licensed under the [MIT License](LICENSE).
 
 Built with ❤️ using **Python**, **PyQt6**, **Llama 3.1**, **Prometheus**, and **Grafana**
 
-*Runs 100% on your hardware. No cloud required.*
+*The AI runs 100% on your hardware. A free NetMind account links the app to your web dashboard.*
 
 </div>
