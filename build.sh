@@ -1,126 +1,188 @@
 #!/bin/bash
-# Build NetMind-Setup single-file executable with PyInstaller
+# Build NetMind binaries with Nuitka (fully self-contained, no Python required on target)
 # Usage: bash build.sh
-# Output: dist/NetMind-Setup
+# Output: dist/NetMind-Setup, dist/NetMind-Uninstaller
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SRC="/opt/netmind"
+INSTALLER_SRC="$SCRIPT_DIR/installer.py"
+UNINSTALLER_SRC="$SCRIPT_DIR/uninstaller.py"
+# Legacy builds kept this in /tmp, which is wiped on reboot. If the repo copy
+# is missing but the old /tmp one exists, pull it into the repo so the source
+# is persistent and version-controlled.
+if [[ ! -f "$UNINSTALLER_SRC" && -f /tmp/uninstaller.py ]]; then
+  cp /tmp/uninstaller.py "$UNINSTALLER_SRC"
+fi
 TARBALL="$SCRIPT_DIR/netmind-app.tar.gz"
-INSTALLER="$SCRIPT_DIR/installer.py"
-PROTECT="$SCRIPT_DIR/cython_protect.sh"
-PROTECTED_DIR="/tmp/netmind-protected"
-UNINSTALLER_SRC="/tmp/uninstaller.py"
-BUILD_WORK="/tmp/netmind-pyi-build"
-BUILD_DIST="/tmp/netmind-pyi-dist"
+BUILD_DIST="/tmp/netmind-nuitka-dist"
+BUILD_WORK="/tmp/netmind-nuitka-build"
 
-# ── Preflight checks ──────────────────────────────────────────────────────────
-[[ -f "$INSTALLER"       ]] || { echo "ERROR: installer.py not found at $INSTALLER"; exit 1; }
-[[ -f "$PROTECT"         ]] || { echo "ERROR: cython_protect.sh not found at $PROTECT"; exit 1; }
-[[ -d "/opt/netmind"     ]] || { echo "ERROR: /opt/netmind not found — app source must exist"; exit 1; }
-[[ -f "$UNINSTALLER_SRC" ]] || { echo "ERROR: uninstaller.py not found at $UNINSTALLER_SRC — make sure /tmp/uninstaller.py exists"; exit 1; }
+# ── Preflight ─────────────────────────────────────────────────────────────────
+[[ -d "$SRC"             ]] || { echo "ERROR: $SRC not found"; exit 1; }
+[[ -f "$INSTALLER_SRC"   ]] || { echo "ERROR: installer.py not found"; exit 1; }
+[[ -f "$UNINSTALLER_SRC" ]] || { echo "ERROR: uninstaller.py not found at $UNINSTALLER_SRC"; exit 1; }
 
-# ── Source backup (Python files only — no .so binaries) ──────────────────────
-echo "Creating source backup (Python files only)..."
-SOURCE_BACKUP="$SCRIPT_DIR/netmind-source-code.tar.gz"
-tar -czf "$SOURCE_BACKUP" \
-  --exclude="*.so" \
-  --exclude="__pycache__" \
-  --exclude="*.pyc" \
-  --exclude="*.c" \
-  --exclude="NetMindDesktop" \
-  --exclude="uninstaller" \
-  -C /opt/netmind \
-  .
-echo "  Source backup: $(du -sh "$SOURCE_BACKUP" | cut -f1)  →  $SOURCE_BACKUP"
+# ── Source backup ─────────────────────────────────────────────────────────────
+echo "Creating source backup..."
+tar -czf "$SCRIPT_DIR/netmind-source-code.tar.gz" \
+  --exclude="*.so" --exclude="__pycache__" --exclude="*.pyc" \
+  --exclude="NetMindDesktop" --exclude="uninstaller" \
+  -C "$SRC" .
+echo "  ✔  Source backup done"
 
-# ── Cython-protect source ─────────────────────────────────────────────────────
-bash "$PROTECT"
+# ── Install patchelf (required by Nuitka onefile on Linux) ────────────────────
+if ! command -v patchelf >/dev/null 2>&1; then
+  echo "Installing patchelf..."
+  apt-get install -y -q patchelf 2>/dev/null || \
+    dnf install -y patchelf 2>/dev/null || \
+    pacman -S --noconfirm patchelf 2>/dev/null || true
+fi
+command -v patchelf >/dev/null 2>&1 || { echo "ERROR: patchelf not found — run: sudo apt install patchelf"; exit 1; }
 
-# ── Install PyInstaller if needed ─────────────────────────────────────────────
-if ! python3 -c "import PyInstaller" 2>/dev/null; then
-  echo "Installing PyInstaller..."
-  pip3 install pyinstaller --quiet --break-system-packages 2>/dev/null || \
-    pip3 install pyinstaller --quiet
+# ── Install Nuitka if needed ──────────────────────────────────────────────────
+if ! python3 -c "import nuitka" 2>/dev/null; then
+  echo "Installing Nuitka..."
+  pip3 install nuitka ordered-set zstandard --quiet \
+    --break-system-packages 2>/dev/null || \
+    pip3 install nuitka ordered-set zstandard --quiet
+fi
+echo "  ✔  Nuitka ready"
+
+# ── Install app requirements on build machine (Nuitka needs them to bundle) ───
+if [[ -f "$SRC/requirements.txt" ]]; then
+  echo "Installing app requirements for bundling..."
+  pip3 install -r "$SRC/requirements.txt" --quiet \
+    --break-system-packages 2>/dev/null || \
+    pip3 install -r "$SRC/requirements.txt" --quiet
+  echo "  ✔  Requirements ready"
 fi
 
-# ── Clean previous build ──────────────────────────────────────────────────────
-rm -rf "$BUILD_WORK" "$BUILD_DIST" \
-       "$SCRIPT_DIR/NetMind-Setup.spec" "$SCRIPT_DIR/NetMind-Uninstaller.spec" 2>/dev/null || true
-# Also wipe project dist/ in case it's root-owned from a previous sudo run
-rm -rf "$SCRIPT_DIR/dist" 2>/dev/null || true
-mkdir -p "$BUILD_WORK" "$BUILD_DIST"
+# ── Prepare clean source dir for Nuitka (no .so files — use .py source) ───────
+NUITKA_SRC="$BUILD_WORK/src"
+rm -rf "$BUILD_DIST" "$BUILD_WORK"
+mkdir -p "$BUILD_DIST" "$BUILD_WORK"
+cp -r "$SRC" "$NUITKA_SRC"
+find "$NUITKA_SRC" -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+echo "  ✔  Source prepared at $NUITKA_SRC"
 
-# ── Build uninstaller binary (self-contained, no Python needed on target) ─────
-echo "Building NetMind-Uninstaller (standalone binary)..."
-pyinstaller \
+# ── Restore core .so files from backup if /opt/netmind/core/ is empty ────────
+BACKUP_CORE="/home/mahdi/Desktop/netmind-source-backup./core"
+if ls "$NUITKA_SRC/core"/*.so 2>/dev/null | grep -qv __init__; then
+  echo "  ✔  Core .so files already present"
+elif [[ -d "$BACKUP_CORE" ]] && ls "$BACKUP_CORE"/*.so 2>/dev/null | grep -q .; then
+  echo "  Core .so missing from $SRC/core/ — restoring from backup..."
+  cp "$BACKUP_CORE"/*.so "$NUITKA_SRC/core/"
+  # Also restore to /opt/netmind/core/ for future builds
+  cp "$BACKUP_CORE"/*.so "$SRC/core/" 2>/dev/null || true
+  echo "  ✔  Restored $(ls "$NUITKA_SRC/core"/*.so | wc -l) core modules"
+else
+  echo "  WARNING: No core .so files found — core modules will not be bundled"
+fi
+
+# ── Detect core modules from .so files (Cython-compiled, Python 3.12) ─────────
+CORE_INCLUDES=""
+for sofile in "$NUITKA_SRC/core"/*.so; do
+  [ -f "$sofile" ] || continue
+  modname=$(basename "$sofile" | cut -d. -f1)
+  [[ "$modname" == "__init__" ]] && continue
+  CORE_INCLUDES="$CORE_INCLUDES --include-module=$modname"
+done
+echo "  ✔  Core modules: $CORE_INCLUDES"
+
+# ── Bundle libpython3.12.so.1.0 (needed by Cython core modules at runtime) ───
+LIBPYTHON_PATH=$(find /usr/lib /usr/lib64 -name "libpython3.12.so.1.0" 2>/dev/null | head -1)
+if [[ -z "$LIBPYTHON_PATH" ]]; then
+  echo "ERROR: libpython3.12.so.1.0 not found — is python3.12-dev installed?"
+  exit 1
+fi
+echo "  ✔  Bundling $LIBPYTHON_PATH"
+LIBPYTHON_INCLUDE="--include-data-files=$LIBPYTHON_PATH=libpython3.12.so.1.0"
+
+# ── Build NetMindDesktop ──────────────────────────────────────────────────────
+echo ""
+echo "Building NetMindDesktop (this takes a few minutes)..."
+cd "$NUITKA_SRC"
+PYTHONPATH="$NUITKA_SRC/core" python3 -m nuitka \
   --onefile \
-  --name "NetMind-Uninstaller" \
-  --distpath "$BUILD_DIST" \
-  --workpath "$BUILD_WORK/uninstaller" \
-  --specpath "$SCRIPT_DIR" \
-  --strip \
-  --clean \
+  --enable-plugin=pyqt6 \
+  $CORE_INCLUDES \
+  $LIBPYTHON_INCLUDE \
+  --include-package=termcolor \
+  --include-package=ollama \
+  --include-package=httpx \
+  --include-package=pydantic \
+  --output-filename=NetMindDesktop \
+  --output-dir="$BUILD_DIST" \
+  --remove-output \
+  --quiet \
+  "$NUITKA_SRC/NetMindDesktop.py"
+chmod +x "$BUILD_DIST/NetMindDesktop"
+echo "  ✔  NetMindDesktop built: $(du -sh "$BUILD_DIST/NetMindDesktop" | cut -f1)"
+
+# ── Build Uninstaller ─────────────────────────────────────────────────────────
+echo ""
+echo "Building NetMind-Uninstaller..."
+python3 -m nuitka \
+  --onefile \
+  --enable-plugin=pyqt6 \
+  --output-filename=NetMind-Uninstaller \
+  --output-dir="$BUILD_DIST" \
+  --remove-output \
+  --quiet \
   "$UNINSTALLER_SRC"
+chmod +x "$BUILD_DIST/NetMind-Uninstaller"
+echo "  ✔  Uninstaller built: $(du -sh "$BUILD_DIST/NetMind-Uninstaller" | cut -f1)"
 
-UNINSTALLER_BIN="$BUILD_DIST/NetMind-Uninstaller"
-[[ -f "$UNINSTALLER_BIN" ]] || { echo "ERROR: Uninstaller build failed"; exit 1; }
-chmod +x "$UNINSTALLER_BIN"
-echo "  ✔  Uninstaller built: $(du -sh "$UNINSTALLER_BIN" | cut -f1)"
-
-# ── Inject standalone uninstaller into protected dir before creating tarball ──
-echo "Injecting uninstaller binary into protected dir..."
-cp "$UNINSTALLER_BIN" "$PROTECTED_DIR/uninstaller"
-chmod +x "$PROTECTED_DIR/uninstaller"
-echo "  ✔  Injected as $PROTECTED_DIR/uninstaller"
-
-# ── Create tarball from protected copy (now includes standalone uninstaller) ──
-echo "Creating tarball from protected source..."
-tar -czf "$TARBALL" -C "$PROTECTED_DIR" .
+# ── Build app tarball ─────────────────────────────────────────────────────────
+echo ""
+echo "Building app tarball..."
+APP_STAGE="$BUILD_WORK/app"
+mkdir -p "$APP_STAGE"
+cp "$BUILD_DIST/NetMindDesktop"      "$APP_STAGE/NetMindDesktop"
+cp "$BUILD_DIST/NetMind-Uninstaller" "$APP_STAGE/uninstaller"
+chmod +x "$APP_STAGE/NetMindDesktop" "$APP_STAGE/uninstaller"
+[ -d "$SRC/assets"       ] && cp -r "$SRC/assets"       "$APP_STAGE/"
+[ -d "$SRC/observability" ] && cp -r "$SRC/observability" "$APP_STAGE/"
+[ -f "$SRC/start.sh"     ] && cp "$SRC/start.sh"     "$APP_STAGE/" && chmod +x "$APP_STAGE/start.sh"
+[ -f "$SRC/stop.sh"      ] && cp "$SRC/stop.sh"      "$APP_STAGE/" && chmod +x "$APP_STAGE/stop.sh"
+tar -czf "$TARBALL" -C "$APP_STAGE" .
 echo "  Tarball: $(du -sh "$TARBALL" | cut -f1)  →  $TARBALL"
 
-# ── Build installer ───────────────────────────────────────────────────────────
+# ── Build Installer ───────────────────────────────────────────────────────────
+echo ""
 echo "Building NetMind-Setup..."
-pyinstaller \
+python3 -m nuitka \
   --onefile \
-  --name "NetMind-Setup" \
-  --distpath "$BUILD_DIST" \
-  --workpath "$BUILD_WORK/installer" \
-  --specpath "$SCRIPT_DIR" \
-  --add-data "$TARBALL:." \
-  --hidden-import tkinter \
-  --hidden-import tkinter.ttk \
-  --hidden-import tkinter.scrolledtext \
-  --hidden-import tkinter.filedialog \
-  --strip \
-  --clean \
-  "$INSTALLER"
+  --enable-plugin=pyqt6 \
+  --include-data-files="$TARBALL=netmind-app.tar.gz" \
+  --output-filename=NetMind-Setup \
+  --output-dir="$BUILD_DIST" \
+  --remove-output \
+  --quiet \
+  "$INSTALLER_SRC"
+chmod +x "$BUILD_DIST/NetMind-Setup"
+echo "  ✔  NetMind-Setup built: $(du -sh "$BUILD_DIST/NetMind-Setup" | cut -f1)"
 
-# ── Copy outputs to project dist/ ────────────────────────────────────────────
-EXE="$BUILD_DIST/NetMind-Setup"
-UN="$BUILD_DIST/NetMind-Uninstaller"
-[[ -f "$EXE" ]] || { echo "ERROR: Build failed — NetMind-Setup not found."; exit 1; }
-
+# ── Copy to project dist/ ─────────────────────────────────────────────────────
 mkdir -p "$SCRIPT_DIR/dist"
-cp "$EXE" "$SCRIPT_DIR/dist/NetMind-Setup"
-cp "$UN"  "$SCRIPT_DIR/dist/NetMind-Uninstaller"
-chmod +x "$SCRIPT_DIR/dist/NetMind-Setup" "$SCRIPT_DIR/dist/NetMind-Uninstaller"
+cp "$BUILD_DIST/NetMind-Setup"       "$SCRIPT_DIR/dist/NetMind-Setup"
+cp "$BUILD_DIST/NetMind-Uninstaller" "$SCRIPT_DIR/dist/NetMind-Uninstaller"
+chmod +x "$SCRIPT_DIR/dist/"*
 
 # ── Copy to NetMind-Release ───────────────────────────────────────────────────
-RELEASE_DIR="$HOME/Desktop/NetMind-Release"
+RELEASE_DIR="/home/$(logname 2>/dev/null || echo mahdi)/Desktop/NetMind-Release"
 if [[ -d "$RELEASE_DIR" ]]; then
   cp "$SCRIPT_DIR/dist/NetMind-Setup" "$RELEASE_DIR/NetMind-Setup"
   chmod +x "$RELEASE_DIR/NetMind-Setup"
   echo "  ✔  Copied to $RELEASE_DIR/NetMind-Setup"
-else
-  echo "  ⚠  $RELEASE_DIR not found — skipping release copy"
 fi
 
 # ── Result ────────────────────────────────────────────────────────────────────
 echo ""
 echo "  ✔  dist/NetMind-Setup        $(du -sh "$SCRIPT_DIR/dist/NetMind-Setup"        | cut -f1)  — installer"
-echo "  ✔  dist/NetMind-Uninstaller  $(du -sh "$SCRIPT_DIR/dist/NetMind-Uninstaller"  | cut -f1)  — bundled inside installer tarball"
+echo "  ✔  dist/NetMind-Uninstaller  $(du -sh "$SCRIPT_DIR/dist/NetMind-Uninstaller"  | cut -f1)  — bundled inside tarball"
 echo ""
-echo "  Release folder:   $RELEASE_DIR/NetMind-Setup"
-echo "  Upload that file to GitHub Releases"
-echo "  Users install with:  sudo -E ./NetMind-Setup  (or double-click)"
+echo "  Upload NetMind-Release/NetMind-Setup to GitHub Releases"
+echo "  Users install with:  sudo -E ./NetMind-Setup"

@@ -24,7 +24,7 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QColor, QPalette, QTextCursor
 
 # ─── Constants ────────────────────────────────────────────────────────────────
-APP_VERSION  = "2.0"
+APP_VERSION  = "2.1.10"
 DEFAULT_DIR  = "/opt/netmind"
 LAUNCHER_BIN = "/usr/local/bin/netmind-launch"
 TARBALL_NAME = "netmind-app.tar.gz"
@@ -44,7 +44,11 @@ MUTED   = "#94a3b8"
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def get_resource(name):
-    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    # PyInstaller uses sys._MEIPASS; Nuitka and dev use __file__ directory
+    if hasattr(sys, "_MEIPASS"):
+        base = sys._MEIPASS
+    else:
+        base = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base, name)
 
 def is_root():
@@ -89,12 +93,29 @@ class InstallWorker(QThread):
         self.step_changed.emit(n, total, title)
         self.log(f"\n── Step {n}/{total}: {title}", "step")
 
+    def _sys_env(self):
+        env = os.environ.copy()
+        # Strip bundled lib path so system tools (apt, curl, systemctl) find correct system libs
+        mei = getattr(sys, '_MEIPASS', '')
+        if not mei:
+            f = os.path.dirname(os.path.abspath(__file__))
+            if f.startswith('/tmp/'):
+                mei = f
+        if mei:
+            ldpath = env.get('LD_LIBRARY_PATH', '')
+            parts = [p for p in ldpath.split(':') if p and not p.startswith(mei)]
+            if parts:
+                env['LD_LIBRARY_PATH'] = ':'.join(parts)
+            else:
+                env.pop('LD_LIBRARY_PATH', None)
+        return env
+
     def run_cmd(self, cmd, shell=False, stream=True):
         try:
             proc = subprocess.Popen(
                 cmd, shell=shell,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, env=os.environ.copy(),
+                text=True, env=self._sys_env(),
             )
             lines = []
             if stream:
@@ -180,6 +201,7 @@ class InstallWorker(QThread):
         else:
             self.log("  Some packages failed — continuing", "warn")
 
+
     # ── Step 3 ────────────────────────────────────────────────────────────────
     def extract_app(self):
         self.log(f"Extracting application to {self.install_dir}...")
@@ -188,7 +210,12 @@ class InstallWorker(QThread):
             raise FileNotFoundError(f"Bundled tarball not found: {tarball}")
         os.makedirs(self.install_dir, exist_ok=True)
         with tarfile.open(tarball, "r:gz") as tar:
-            tar.extractall(self.install_dir)
+            # filter="data" (Python 3.12+) rejects absolute paths and ".."
+            # traversal in member names. Fall back on older interpreters.
+            try:
+                tar.extractall(self.install_dir, filter="data")
+            except TypeError:
+                tar.extractall(self.install_dir)
         try:
             for root, dirs, files in os.walk(self.install_dir):
                 for d in dirs:
@@ -216,12 +243,12 @@ class InstallWorker(QThread):
         if not os.path.exists(reqs):
             self.log("  requirements.txt not found — skipping", "warn")
             return
-        flags = ["--quiet", "--no-warn-script-location"]
+        # App binary is self-contained (Nuitka) — deps only needed for observability scripts
+        flags = ["--quiet", "--no-warn-script-location", "--break-system-packages"]
         code, _ = self.run_cmd(["pip3", "install"] + flags + ["-r", reqs])
         if code != 0:
-            self.log("  Retrying with --break-system-packages...")
-            self.run_cmd(["pip3", "install"] + flags +
-                         ["--break-system-packages", "--ignore-installed", "-r", reqs])
+            self.log("  pip3 install failed — skipping (app will still work)", "warn")
+            return
         self.log("  Python packages installed", "ok")
 
     # ── Step 5 ────────────────────────────────────────────────────────────────
@@ -369,8 +396,6 @@ class InstallWorker(QThread):
             'export DISPLAY="${DISPLAY:-:0}"\n'
             f'export XAUTHORITY="${{XAUTHORITY:-{real_home}/.Xauthority}}"\n'
             "export QT_X11_NO_MITSHM=1\n\n"
-            "for sp in /home/*/.local/lib/python*/site-packages; do\n"
-            '  export PYTHONPATH="$sp:${PYTHONPATH}"\ndone\n\n'
             "docker info > /dev/null 2>&1 || {\n"
             "  systemctl start docker 2>/dev/null || service docker start 2>/dev/null || true\n"
             "  sleep 3\n}\n\n"
@@ -382,11 +407,7 @@ class InstallWorker(QThread):
             f'  su - {real_user} -c "nohup ollama serve > /tmp/ollama.log 2>&1 &" 2>/dev/null || true\n'
             "  sleep 3\n}\n\n"
             'cd "$INSTALL_DIR"\n'
-            f'if [ -x "{install_dir}/NetMindDesktop" ]; then\n'
-            f'  exec "{install_dir}/NetMindDesktop"\n'
-            f'else\n'
-            f'  exec python3 -B "{install_dir}/NetMindDesktop.py"\n'
-            f'fi\n'
+            f'exec "{install_dir}/NetMindDesktop"\n'
         )
         with open(LAUNCHER_BIN, "w") as f:
             f.write(launcher)
@@ -469,8 +490,6 @@ StartupWMClass=NetMindDesktop
             f'export DISPLAY="${{DISPLAY:-:0}}"\n'
             f'export XAUTHORITY="${{XAUTHORITY:-{real_home}/.Xauthority}}"\n'
             "export QT_X11_NO_MITSHM=1\n"
-            "for sp in /home/*/.local/lib/python*/site-packages; do\n"
-            '  export PYTHONPATH="$sp:${PYTHONPATH}"\ndone\n'
             f'if [ -x "{install_dir}/uninstaller" ]; then\n'
             f'  exec "{install_dir}/uninstaller"\n'
             f'else\n'
@@ -530,11 +549,15 @@ StartupNotify=true
             ("PyQt6",
              ["python3", "-c", "from PyQt6.QtWidgets import QApplication"]),
             ("Scapy",            ["python3", "-c", "import scapy"]),
-            ("prometheus-client",["python3", "-c", "import prometheus_client"]),
+            ("prometheus-client",
+             ["sh", "-c",
+              "python3 -c 'import prometheus_client' 2>/dev/null || "
+              "pip3 show prometheus-client > /dev/null 2>&1"]),
             ("Docker",           ["docker", "--version"]),
             ("Docker Compose",   ["docker", "compose", "version"]),
-            ("Ollama API",
-             ["curl", "-sf", "http://localhost:11434/api/tags"]),
+            ("Ollama binary",    ["which", "ollama"]),
+            ("Llama 3.1 model",
+             ["sh", "-c", "ollama list 2>/dev/null | grep -q llama3.1"]),
             ("NetMindDesktop",
              ["sh", "-c",
               f'test -x "{self.install_dir}/NetMindDesktop" || '
@@ -753,7 +776,7 @@ class MainWindow(QMainWindow):
 
         btn_cancel = self._make_sbtn("Cancel", self.close)
         state = True if is_root() else False
-        btn_next = self._make_btn("Next  →", handler=lambda: self._goto(self.PAGE_CONFIGURE))
+        btn_next = self._make_btn("Next  →", handler=lambda _=None: self._goto(self.PAGE_CONFIGURE))
         btn_next.setEnabled(state)
 
         btn_row = QWidget(w)
@@ -805,7 +828,7 @@ class MainWindow(QMainWindow):
         self._label(w, note, 10, color=MUTED).setGeometry(40, 206, 620, 60)
 
         btn_cancel = self._make_sbtn("Cancel", self.close)
-        btn_back   = self._make_sbtn("← Back", lambda: self._goto(self.PAGE_WELCOME))
+        btn_back   = self._make_sbtn("← Back", lambda _=None: self._goto(self.PAGE_WELCOME))
         btn_install = self._make_btn("Install  ▶", bg=GREEN,
                                      handler=self._start_install)
 
@@ -820,7 +843,7 @@ class MainWindow(QMainWindow):
         lay.addWidget(btn_install)
         return w
 
-    def _browse(self):
+    def _browse(self, _=None):
         d = QFileDialog.getExistingDirectory(self, "Choose folder", "/opt")
         if d:
             self._install_dir = d
@@ -877,14 +900,14 @@ class MainWindow(QMainWindow):
         )
         self._log_box.moveCursor(QTextCursor.MoveOperation.End)
 
-    def _start_install(self):
+    def _start_install(self, _=None):
         self._installing = True
         self._goto(self.PAGE_INSTALLING)
         self._worker = InstallWorker(self._install_dir)
         self._worker.log_line.connect(self._append_log)
         self._worker.progress.connect(self._prog.setValue)
         self._worker.step_changed.connect(
-            lambda n, t, title: self._step_lbl.setText(f"Step {n}/{t}: {title}")
+            lambda n, t, title: self._step_lbl.setText(f"Step {n}/{t}:  {title}")
         )
         self._worker.finished.connect(self._on_install_done)
         self._worker.start()
@@ -918,7 +941,7 @@ class MainWindow(QMainWindow):
         self._finish_widget.setStyleSheet(f"background: {BG};")
         return self._finish_widget
 
-    def _show_finish(self):
+    def _show_finish(self, _=None):
         # Rebuild the finish page with real success/error state
         w = self._finish_widget
         # Clear
@@ -965,16 +988,30 @@ class MainWindow(QMainWindow):
         btn_row.show()
         self._goto(self.PAGE_FINISH, sub)
 
-    def _launch_now(self):
+    def _launch_now(self, _=None):
         real_home = get_real_home()
         env = os.environ.copy()
         env["DISPLAY"]    = os.environ.get("DISPLAY", ":0")
         env["XAUTHORITY"] = os.environ.get("XAUTHORITY", real_home + "/.Xauthority")
-        subprocess.Popen(
+        proc = subprocess.Popen(
             ["/usr/local/bin/netmind-launch"],
             start_new_session=True,
             env=env,
         )
+        # If the launcher exits within 3 seconds the binary likely failed to start.
+        # Show the log path so the user can diagnose.
+        try:
+            proc.wait(timeout=3)
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self, "Launch failed",
+                "NetMind failed to start.\n\n"
+                "Check  /tmp/netmind.log  for the error.\n\n"
+                "You can still launch it later from your Desktop shortcut."
+            )
+            return
+        except subprocess.TimeoutExpired:
+            pass  # still running — normal
         self.close()
 
 
@@ -985,24 +1022,54 @@ if __name__ == "__main__":
         os.environ["DISPLAY"] = ":0"
 
     if not is_root():
-        print("[NetMind Setup] Root required — re-launching with pkexec ...")
         _dpy   = os.environ.get("DISPLAY", ":0")
         _xauth = os.environ.get("XAUTHORITY", os.path.expanduser("~/.Xauthority"))
-        # pkexec shows a GUI password dialog — works when double-clicked
+        _bin   = os.path.abspath(sys.argv[0])
+
+        # Try pkexec — shows GUI password dialog on most desktops
         try:
-            os.execvp("pkexec", [
-                "pkexec", "env",
-                f"DISPLAY={_dpy}",
-                f"XAUTHORITY={_xauth}",
-                sys.executable,
-            ] + sys.argv[1:])
+            os.execvp("pkexec", ["pkexec", "env",
+                f"DISPLAY={_dpy}", f"XAUTHORITY={_xauth}",
+                _bin] + sys.argv[1:])
         except Exception:
             pass
-        # Fallback: sudo (only works from a terminal)
-        try:
-            os.execvp("sudo", ["sudo", "-E", sys.executable] + sys.argv)
-        except Exception:
-            pass
+
+        # pkexec unavailable — open a terminal emulator with sudo
+        import tempfile
+        _tmpf = tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False)
+        _tmpf.write(f'#!/bin/bash\nexec sudo -E "{_bin}"\n')
+        _tmpf.close()
+        os.chmod(_tmpf.name, 0o755)
+
+        _terms = [
+            ["xterm", "-e"],
+            ["x-terminal-emulator", "-e"],
+            ["gnome-terminal", "--"],
+            ["konsole", "-e"],
+            ["xfce4-terminal", "-e"],
+            ["mate-terminal", "-e"],
+            ["lxterminal", "-e"],
+            ["tilix", "-e"],
+        ]
+        for _t in _terms:
+            try:
+                subprocess.Popen(_t + [_tmpf.name])
+                sys.exit(0)
+            except FileNotFoundError:
+                continue
+
+        # No terminal found — show GUI message
+        _app = QApplication(sys.argv)
+        _msg = QMessageBox()
+        _msg.setWindowTitle("Administrator Required")
+        _msg.setText(
+            "NetMind Setup requires administrator privileges.\n\n"
+            "Please open a terminal and run:\n\n"
+            f"    sudo -E \"{_bin}\""
+        )
+        _msg.setIcon(QMessageBox.Icon.Critical)
+        _msg.exec()
+        sys.exit(1)
 
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
