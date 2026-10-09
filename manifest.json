@@ -1,0 +1,12 @@
+{
+  "version": "2.1.9",
+  "release_date": "2026-10-07",
+  "changelog": [
+    "Fixed: initialization failing silently on some network configurations",
+    "Fixed: AI policy generator always producing a generic default policy",
+    "Fixed: onboarding network description now correctly applied to AI decisions",
+    "Fixed: app icon not appearing after installation",
+    "Improved: AI agent responses are more accurate and follow network rules reliably"
+  ],
+  "update_url": "https://github.com/Shadownikka/NetMind/releases/download/v2.1.9/netmind-update-v2.1.9.tar.gz"
+}
