@@ -1,12 +1,15 @@
 {
-  "version": "2.1.9",
-  "release_date": "2026-10-07",
+  "version": "2.1.10",
+  "release_date": "2026-10-09",
   "changelog": [
-    "Fixed: initialization failing silently on some network configurations",
-    "Fixed: AI policy generator always producing a generic default policy",
-    "Fixed: onboarding network description now correctly applied to AI decisions",
-    "Fixed: app icon not appearing after installation",
-    "Improved: AI agent responses are more accurate and follow network rules reliably"
+    "Fixed: app logo now shows correctly across all screens (dashboard, AI prompt, AutoPilot panel)",
+    "Added: back button on AI prompt page to return to dashboard",
+    "Fixed: bandwidth limits no longer silently clobber each other when multiple devices are managed",
+    "Fixed: kernel network settings now properly restored when app stops",
+    "Fixed: app no longer freezes the UI when stopping network monitoring",
+    "Fixed: AutoPilot no longer shows upgrade popup on free plan startup",
+    "Fixed: memory leak in connection tracker for active devices",
+    "Fixed: iptables rules now cleaned up properly on stop"
   ],
-  "update_url": "https://github.com/Shadownikka/NetMind/releases/download/v2.1.9/netmind-update-v2.1.9.tar.gz"
+  "update_url": "https://github.com/Shadownikka/NetMind/releases/download/v2.1.10/NetMind-Setup"
 }
