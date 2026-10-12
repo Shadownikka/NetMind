@@ -1,0 +1,20 @@
+{
+  "version": "2.1.3",
+  "platform": "windows",
+  "release_date": "2026-10-12",
+  "changelog": [
+    "New: NetMind is now available on Windows 11",
+    "Fixed (critical): bandwidth limits now actually throttle a device to the chosen speed instead of cutting off its internet entirely",
+    "Fixed (critical): re-blocking a device on the free tier could silently fail after FIFO eviction — re-blocking now works reliably",
+    "Fixed (critical): the app could fail to initialize on some installs because a required component was not packaged into the build — all components are now bundled and verified before shipping",
+    "Fixed: per-device bandwidth limits no longer collide — each device gets its own traffic-control class",
+    "Fixed: kernel network settings are now saved on start and fully restored when the app stops",
+    "Fixed: paid features now stay locked until your account plan is confirmed",
+    "Added: a 'Later' option after an update so you can keep working and restart when ready",
+    "Fixed: the app logo now shows correctly across all screens",
+    "Fixed: the network monitor no longer freezes the interface when stopping",
+    "Fixed: AutoPilot no longer shows an upgrade popup on free-plan startup",
+    "Security: hardened the installer against malicious update archives (path-traversal protection)"
+  ],
+  "update_url": "https://github.com/Shadownikka/NetMind/releases/download/v2.1.3-windows/NetMind-Setup-Windows.exe"
+}
