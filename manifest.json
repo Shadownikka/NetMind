@@ -1,7 +1,10 @@
 {
-  "version": "2.1.3",
-  "release_date": "2026-10-10",
+  "version": "2.1.1",
+  "release_date": "2026-10-13",
   "changelog": [
+    "Fixed: the connection-lost notification popup now reliably appears on top when controls lock after a sync loss",
+    "Fixed (security): paid features could remain accessible after losing cloud connectivity — controls now lock immediately when authentication is rejected or the session cannot be verified, and re-enable automatically on reconnect",
+    "Improved: temporary connection drops now give a 10-second grace period before locking controls, so brief network blips do not interrupt your work",
     "Fixed (critical): re-blocking a device on the free tier could silently fail after FIFO eviction — the traffic-control class was left orphaned because its filter was deleted in the wrong order; re-blocking now works reliably",
     "Fixed (critical): bandwidth limits now actually throttle a device to the chosen speed instead of cutting off its internet entirely — a leftover traffic-marking rule could clash with other security/firewall software and block all traffic",
     "Fixed (critical): the app could fail to initialize on some installs because a required component was not packaged into the build — all components are now bundled and verified before shipping",
@@ -20,5 +23,5 @@
     "Fixed: a rare crash when closing the app during startup or plan loading",
     "Security: hardened the installer against malicious update archives (path-traversal protection)"
   ],
-  "update_url": "https://github.com/Shadownikka/NetMind/releases/download/v2.1.3/netmind-update-v2.1.3.tar.gz"
+  "update_url": "https://github.com/Shadownikka/NetMind/releases/download/v2.1.1/netmind-update-v2.1.1.tar.gz"
 }
