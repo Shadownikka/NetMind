@@ -1,8 +1,9 @@
 {
-  "version": "2.1.2",
+  "version": "2.1.3",
   "platform": "windows",
-  "release_date": "2026-10-21",
+  "release_date": "2026-10-22",
   "changelog": [
+    "Beta: fixes high ping / lag while NetMind is running. Network traffic is no longer routed through the app's shaping path unless a device is actually being limited, so your own connection (gaming, calls, video) stays responsive. Please test and report back.",
     "Fixed: the installer now reliably installs the Npcap network driver — devices could previously fail to appear because the driver was skipped during setup",
     "Fixed: the traffic-shaping driver now ships as officially signed binaries, resolving false-positive warnings from Kaspersky and other antivirus software",
     "Fixed: the app no longer fails to start on non-English versions of Windows (for example French) where the loopback network adapter is renamed",
@@ -21,5 +22,5 @@
     "Fixed: AutoPilot no longer shows an upgrade popup on free-plan startup",
     "Security: hardened the installer against malicious update archives (path-traversal protection)"
   ],
-  "update_url": "https://github.com/Shadownikka/NetMind/releases/download/v2.1.2-windows/netmind-update-windows-v2.1.2.tar.gz"
+  "update_url": "https://github.com/Shadownikka/NetMind/releases/download/v2.1.3-beta/netmind-update-windows-v2.1.3.tar.gz"
 }
