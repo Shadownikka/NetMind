@@ -1,21 +1,44 @@
-MIT License
+NetMind License
 
-Copyright (c) 2026 NetMind
+Copyright (c) 2026 NetMind. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+The NetMind software, including the installers, applications, update packages
+and related files distributed in this repository and its releases (the
+"Software"), is proprietary. It is licensed, not sold.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. Permitted use
+   You may download, install and use the Software to manage networks you own
+   or are authorised to manage, in accordance with the NetMind Terms of
+   Service at https://netmindapp.com/terms.html.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. Restrictions
+   Except where applicable law expressly permits it, you may not:
+   - copy, modify, or create derivative works of the Software;
+   - reverse engineer, decompile, or disassemble the Software, or attempt to
+     extract its source code;
+   - sell, rent, sublicense, redistribute, or otherwise transfer the Software
+     or access to it;
+   - remove or alter any copyright or proprietary notices.
+
+3. Ownership
+   NetMind retains all rights, title and interest in the Software, including
+   the NetMind name and logo. No rights are granted except those stated here.
+
+4. No warranty
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+5. Limitation of liability
+   TO THE MAXIMUM EXTENT PERMITTED BY LAW, NETMIND SHALL NOT BE LIABLE FOR ANY
+   CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM, OUT OF OR IN CONNECTION
+   WITH THE SOFTWARE OR ITS USE.
+
+6. Third-party components
+   The Software includes third-party components that remain under their own
+   licenses, which take precedence over this license for those components.
+   Notably, the Windows version includes WinDivert
+   (https://github.com/basil00/WinDivert), used under the GNU Lesser General
+   Public License v3 (https://www.gnu.org/licenses/lgpl-3.0.html).
+
+Questions: contact@netmindapp.com
