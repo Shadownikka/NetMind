@@ -78,7 +78,7 @@ Prices and how to upgrade: [netmindapp.com/pricing](https://netmindapp.com/prici
 ## Privacy
 
 - **The AI runs on your own computer** (Llama 3.1). Your chat messages and network data are not sent to an AI service.
-- **Device names and models never leave your network.** The cloud dashboard only sees labels such as `Device-23`, with their speeds and status.
+- **From version 2.1.3 (in beta now), device names and models never leave your network.** The cloud dashboard only sees labels such as `Device-23`, with their speeds and status. Older versions also send device names to your dashboard.
 - NetMind measures how much data each device uses. It does **not** read the content of anyone's traffic.
 
 Full details: [Privacy Policy](https://netmindapp.com/privacy.html).
