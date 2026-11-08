@@ -1,26 +1,20 @@
 {
   "version": "2.1.3",
   "platform": "windows",
-  "release_date": "2026-10-22",
+  "release_date": "2026-11-08",
   "changelog": [
-    "Beta: fixes high ping / lag while NetMind is running. Network traffic is no longer routed through the app's shaping path unless a device is actually being limited, so your own connection (gaming, calls, video) stays responsive. Please test and report back.",
-    "Fixed: the installer now reliably installs the Npcap network driver — devices could previously fail to appear because the driver was skipped during setup",
-    "Fixed: the traffic-shaping driver now ships as officially signed binaries, resolving false-positive warnings from Kaspersky and other antivirus software",
-    "Fixed: the app no longer fails to start on non-English versions of Windows (for example French) where the loopback network adapter is renamed",
-    "Fixed (security): paid features could remain accessible after losing cloud connectivity — controls now lock immediately when authentication is rejected or the session cannot be verified, and re-enable automatically on reconnect",
-    "Improved: temporary connection drops now give a 10-second grace period before locking controls, so brief network blips do not interrupt your work",
-    "New: NetMind is now available on Windows 11",
-    "Fixed (critical): bandwidth limits now actually throttle a device to the chosen speed instead of cutting off its internet entirely",
-    "Fixed (critical): re-blocking a device on the free tier could silently fail after FIFO eviction — re-blocking now works reliably",
-    "Fixed (critical): the app could fail to initialize on some installs because a required component was not packaged into the build — all components are now bundled and verified before shipping",
-    "Fixed: per-device bandwidth limits no longer collide — each device gets its own traffic-control class",
-    "Fixed: kernel network settings are now saved on start and fully restored when the app stops",
-    "Fixed: paid features now stay locked until your account plan is confirmed",
-    "Added: a 'Later' option after an update so you can keep working and restart when ready",
-    "Fixed: the app logo now shows correctly across all screens",
-    "Fixed: the network monitor no longer freezes the interface when stopping",
-    "Fixed: AutoPilot no longer shows an upgrade popup on free-plan startup",
-    "Security: hardened the installer against malicious update archives (path-traversal protection)"
+    "New: Smart AutoPilot acts on how full your internet line is, slows the biggest users first, and removes its own limits when the line is free again",
+    "New: internet speed and a Re-measure button on the AutoPilot card (speed test to Cloudflare, no device data sent)",
+    "New: real device names from your router, from what devices announce, and from their traffic; rename any device by double-clicking it",
+    "New: inactive devices are hidden after 10 minutes, with a Forget button; a device that gets a new IP stays one row and keeps its limit",
+    "New: AI chat understands Mbps/KB/s, 'him / it / everyone', and asks before acting when unsure",
+    "Improved: the AI model only runs when needed, so it no longer uses several GB of memory all the time",
+    "Improved: the device list stays smooth on big networks",
+    "Improved: lighter connection to netmindapp.com",
+    "Fixed: AutoPilot never touches devices you protected or limits you set yourself",
+    "Fixed: limits keep working after a modem restart or Wi-Fi drop",
+    "Fixed: trusting a device removes its Limit/Block buttons right away",
+    "Improved: lower ping while NetMind runs"
   ],
-  "update_url": "https://github.com/Shadownikka/NetMind/releases/download/v2.1.3-beta/netmind-update-windows-v2.1.3.tar.gz"
+  "update_url": "https://github.com/Shadownikka/NetMind/releases/download/v2.1.3-windows/netmind-update-windows-v2.1.3.tar.gz"
 }
